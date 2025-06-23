@@ -15,5 +15,5 @@ github_org: DiamondLightSource
 package_name: imaging_bluesky
 pypi: true
 repo_name: imaging-bluesky
-strict_typing: true
+strict_typing: false
 type_checker: pyright

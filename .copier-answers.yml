@@ -1,0 +1,19 @@
+# Changes here will be overwritten by Copier
+_commit: 4.0.1
+_src_path: https://github.com/DiamondLightSource/python-copier-template.git
+author_email: paula.martin-gomez@diamond.ac.uk
+author_name: Paula Martin
+component_lifecycle: experimental
+component_owner: group:default/data-acquisition
+component_type: library
+description: Bluesky plans and tools for the Imaging Group
+distribution_name: imaging-bluesky
+docker: true
+docs_type: README
+git_platform: github.com
+github_org: DiamondLightSource
+package_name: imaging_bluesky
+pypi: true
+repo_name: imaging-bluesky
+strict_typing: true
+type_checker: pyright

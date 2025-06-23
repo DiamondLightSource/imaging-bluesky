@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: imaging-bluesky
+  title: imaging-bluesky
+  description: Bluesky plans and tools for the Imaging Group
+spec:
+  type: library
+  lifecycle: experimental
+  owner: group:default/data-acquisition

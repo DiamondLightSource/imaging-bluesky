@@ -8,21 +8,26 @@ from dodal.common.visit import (
     LocalDirectoryServiceClient,
     StaticVisitPathProvider,
 )
-from dodal.utils import get_beamline_name
+from dodal.utils import BeamlinePrefix, get_beamline_name
 from ophyd_async.plan_stubs import ensure_connected
-from spectroscopy_bluesky.p49.devices import panda
-from spectroscopy_bluesky.p49.stages import Stages
+
+from imaging_bluesky.p49.devices.devices import panda
+from imaging_bluesky.p49.devices.stages import Stages
 
 BL = get_beamline_name("p49")
+PREFIX = BeamlinePrefix(BL)
+
 set_path_provider(
     StaticVisitPathProvider(
-        BL,
-        Path("/exports/p49/data/2025"),
+        get_beamline_name("p49"),
+        Path("/exports/mybeamline/data"),
         client=LocalDirectoryServiceClient(),
     )
 )
-p49_stages = Stages("BL49P")
-p = panda()
+
+
+stages = Stages(PREFIX.beamline_prefix)
+panda_device = panda(PREFIX.beamline_prefix)
 
 RE = RunEngine()
-RE(ensure_connected(p49_stages, p))
+RE(ensure_connected(stages, panda_device))

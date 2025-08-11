@@ -1,12 +1,15 @@
-from dodal.common.beamlines.beamline_utils import (
-    get_path_provider,
-)
+from dodal.common.beamlines.beamline_utils import device_factory, get_path_provider
+from dodal.utils import BeamlinePrefix, get_beamline_name
 from ophyd_async.fastcs.panda import HDFPanda
 
+BL = get_beamline_name("p49")
+PREFIX = BeamlinePrefix(BL)
 
-def panda(beamline_prefix: str) -> HDFPanda:
+
+@device_factory()
+def panda() -> HDFPanda:
     return HDFPanda(
-        f"{beamline_prefix}-MO-PANDA-01:",
+        f"{PREFIX.beamline_prefix}-MO-PANDA-01:",
         path_provider=get_path_provider(),
         name="panda",
     )

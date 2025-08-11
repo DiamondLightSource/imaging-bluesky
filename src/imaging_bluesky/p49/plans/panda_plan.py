@@ -18,7 +18,8 @@ from ophyd_async.fastcs.panda import (
 )
 
 # for calculations
-MRES = -0.000125
+# MRES = -0.000125
+MRES = 0.018
 
 
 def fly_scan(

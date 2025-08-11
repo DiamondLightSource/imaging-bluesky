@@ -20,7 +20,7 @@ dependencies = [
     "matplotlib",
     "databroker",
     "scipy",
-    "dls-dodal @ git+https://github.com/DiamondLightSource/dodal@i20_1_add_panda_and_motors",
+    "dls-dodal",
     "typer",
 ]
 dynamic = ["version"]

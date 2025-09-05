@@ -4,12 +4,8 @@ import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
 from bluesky.utils import MsgGenerator
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
-from ophyd_async.core import (
-    DetectorTrigger,
-    StandardFlyer,
-    TriggerInfo,
-)
-from ophyd_async.epics.motor import FlyMotorInfo, Motor
+from ophyd_async.core import DetectorTrigger, FlyMotorInfo, StandardFlyer, TriggerInfo
+from ophyd_async.epics.motor import Motor
 from ophyd_async.fastcs.panda import (
     HDFPanda,
     PandaPcompDirection,
@@ -18,8 +14,8 @@ from ophyd_async.fastcs.panda import (
 )
 
 # for calculations
-# MRES = -0.000125
-MRES = 0.018
+MRES_X = -0.000125
+MRES_THETA = 0.018
 
 
 def fly_scan(
@@ -31,6 +27,13 @@ def fly_scan(
     panda: HDFPanda,
 ) -> MsgGenerator:
     panda_pcomp = StandardFlyer(StaticPcompTriggerLogic(panda.pcomp[1]))
+
+    if motor.name == "x":
+        MRES = MRES_X
+    elif motor.name == "theta":
+        MRES = MRES_THETA
+    else:
+        raise ValueError("Motor name not supported")
 
     @attach_data_session_metadata_decorator()
     @bpp.run_decorator()

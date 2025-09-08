@@ -18,5 +18,5 @@ def panda() -> HDFPanda:
 
 
 @device_factory()
-def stages() -> Stages:
+def alignment_stages() -> Stages:
     return Stages(PREFIX.beamline_prefix)

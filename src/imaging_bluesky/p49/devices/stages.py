@@ -9,6 +9,6 @@ class Stages(StandardReadable):
 
     def __init__(self, beamline_prefix: str, name: str = "") -> None:
         with self.add_children_as_readables():
-            self.x = Motor(beamline_prefix + "-MO-MAP-01:STAGE:X")
-            self.theta = Motor(beamline_prefix + "-MO-MAP-01:STAGE:A")
+            self.x = Motor(beamline_prefix + "-MO-MAP-01:STAGE:X", "x")
+            self.theta = Motor(beamline_prefix + "-MO-MAP-01:STAGE:A", "theta")
         super().__init__(name=name)

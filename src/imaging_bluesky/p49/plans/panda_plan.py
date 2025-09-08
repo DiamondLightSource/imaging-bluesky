@@ -4,12 +4,8 @@ import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
 from bluesky.utils import MsgGenerator
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
-from ophyd_async.core import (
-    DetectorTrigger,
-    StandardFlyer,
-    TriggerInfo,
-)
-from ophyd_async.epics.motor import FlyMotorInfo, Motor
+from ophyd_async.core import DetectorTrigger, FlyMotorInfo, StandardFlyer, TriggerInfo
+from ophyd_async.epics.motor import Motor
 from ophyd_async.fastcs.panda import (
     HDFPanda,
     PandaPcompDirection,
@@ -18,8 +14,8 @@ from ophyd_async.fastcs.panda import (
 )
 
 # for calculations
-# MRES = -0.000125
-MRES = 0.018
+MRES_X = -0.000125
+MRES_THETA = 0.018
 
 
 def fly_scan(
@@ -30,7 +26,33 @@ def fly_scan(
     motor: Motor,
     panda: HDFPanda,
 ) -> MsgGenerator:
+    """
+    Perform a fly scan.
+
+    Args:
+        start (float): Starting position in mm.
+        stop (float): Ending position in mm.
+        num (int): Number of steps.
+        duration (float): Duration to acquire each frame, in seconds.
+        motor (Motor): Motor instance.
+        panda (HDFPanda): Data acquisition device.
+
+    Yields:
+    - Messages for the scan process (MsgGenerator).
+    """
+
+    # Describes the Panda PCOMP block.
+    # It is responsible for generating the triggers based on a position and step size.
     panda_pcomp = StandardFlyer(StaticPcompTriggerLogic(panda.pcomp[1]))
+
+    # MRES changes depending on the motor.
+    # Getting this value from the motor will be soon available through an async function
+    if motor.name == "x":
+        MRES = MRES_X
+    elif motor.name == "theta":
+        MRES = MRES_THETA
+    else:
+        raise ValueError("Motor name not supported")
 
     @attach_data_session_metadata_decorator()
     @bpp.run_decorator()
@@ -44,6 +66,7 @@ def fly_scan(
             end_position=stop_pos,
             time_for_move=num * duration,
         )
+        # Info used to generate the triggers.
         panda_pcomp_info = PcompInfo(
             start_postion=ceil(start_pos / abs(MRES)),
             pulse_width=1,
@@ -54,6 +77,8 @@ def fly_scan(
             else PandaPcompDirection.POSITIVE,
         )
 
+        # Info on configuring the data writer block for the Panda device.
+        # This sets the number of frames that are expected.
         panda_hdf_info = TriggerInfo(
             number_of_events=num,
             trigger=DetectorTrigger.CONSTANT_GATE,
@@ -67,11 +92,12 @@ def fly_scan(
         yield from bps.prepare(panda_pcomp, panda_pcomp_info, wait=True)
 
         # Kickoff the motor last to ensure other components are initialized first.
-        # Otherwise, the motor might move before other parts are ready.
+        # Otherwise, the motor might move before other devices are ready.
         yield from bps.kickoff(panda)
         yield from bps.kickoff(panda_pcomp, wait=True)
         yield from bps.kickoff(motor, wait=True)
 
+        # Needs to wait for each flyable object to complete.
         yield from bps.complete_all(motor, panda_pcomp, panda, wait=True)
 
     yield from inner_plan()

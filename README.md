@@ -7,27 +7,36 @@
 
 Bluesky plans and tools for the Imaging Group
 
-This is where you should write a short paragraph that describes what your module does,
-how it does it, and why people should use it.
-
 Source          | <https://github.com/DiamondLightSource/imaging-bluesky>
 :---:           | :---:
 PyPI            | `pip install imaging-bluesky`
 Docker          | `docker run ghcr.io/diamondlightsource/imaging-bluesky:latest`
 Releases        | <https://github.com/DiamondLightSource/imaging-bluesky/releases>
 
-This is where you should put some images or code snippets that illustrate
-some relevant examples. If it is a library then you might put some
-introductory code here:
+# Data Collection in the Training Rigs
 
-```python
-from imaging_bluesky import __version__
+## Running the IPython Terminal
 
-print(f"Hello imaging_bluesky {__version__}")
-```
+1. Open **VSCode** with the container.
+2. Open a terminal inside the **VSCode container**.
+3. Run the following command:
 
-Or if it is a commandline tool then you might put some example commands here:
+   ```bash
+   ipython -i startup_p49.py
+    ```
+3. To run a scan in the IPython terminal:
+    ```python
+    RE(fly_scan(0, 10, 11, 1, stages.x, panda_device))
+    ```
+## Retrieving data
 
-```
-python -m imaging_bluesky --version
-```
+1. SSH into the Beamline server
+2. Navigate to the data directory:
+   ```bash
+   cd /exports/mybeamline/data
+    ```
+3. Copy the data file to your home directory:
+   ```bash
+   cp p49-X-panda.h5 ~/
+    ```
+4. Open the .h5 file in **DAWN** for analysis.

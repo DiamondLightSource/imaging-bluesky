@@ -30,8 +30,8 @@ def fly_scan(
     Perform a fly scan.
 
     Args:
-        start (float): Starting position.
-        stop (float): Ending position.
+        start (float): Starting position in mm.
+        stop (float): Ending position in mm.
         num (int): Number of steps.
         duration (float): Duration to acquire each frame, in seconds.
         motor (Motor): Motor instance.

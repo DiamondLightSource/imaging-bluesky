@@ -17,6 +17,7 @@ dependencies = [
     "ophyd",
     "ophyd_async",
     "pandas",
+    "ipython",
     "matplotlib",
     "databroker",
     "scipy",

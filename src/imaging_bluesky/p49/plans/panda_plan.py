@@ -5,6 +5,7 @@ import bluesky.preprocessors as bpp
 from bluesky.utils import MsgGenerator
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from ophyd_async.core import DetectorTrigger, FlyMotorInfo, StandardFlyer, TriggerInfo
+from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.epics.motor import Motor
 from ophyd_async.fastcs.panda import (
     HDFPanda,
@@ -25,6 +26,7 @@ def fly_scan(
     duration: float,
     motor: Motor,
     panda: HDFPanda,
+    detector: AravisDetector,
 ) -> MsgGenerator:
     """
     Perform a fly scan.
@@ -47,12 +49,12 @@ def fly_scan(
 
     # MRES changes depending on the motor.
     # Getting this value from the motor will be soon available through an async function
-    if motor.name == "x":
+    if motor.name == "alignment_stages-x":
         MRES = MRES_X
-    elif motor.name == "theta":
+    elif motor.name == "alignment_stages-theta":
         MRES = MRES_THETA
     else:
-        raise ValueError("Motor name not supported")
+        raise ValueError(f"Motor name ({motor.name}) not supported")
 
     @attach_data_session_metadata_decorator()
     @bpp.run_decorator()
@@ -86,18 +88,27 @@ def fly_scan(
             deadtime=1e-5,
         )
 
+        detector_info = TriggerInfo(
+            number_of_events=num,
+            trigger=DetectorTrigger.CONSTANT_GATE,
+            livetime=duration - 0.1,
+            deadtime=0.1,
+        )
+
         # The order of these prepare calls does not matter, as we are setting the PVs.
         yield from bps.prepare(motor, motor_info)
         yield from bps.prepare(panda, panda_hdf_info)
+        yield from bps.prepare(detector, detector_info)
         yield from bps.prepare(panda_pcomp, panda_pcomp_info, wait=True)
 
         # Kickoff the motor last to ensure other components are initialized first.
         # Otherwise, the motor might move before other devices are ready.
         yield from bps.kickoff(panda)
         yield from bps.kickoff(panda_pcomp, wait=True)
+        yield from bps.kickoff(detector, wait=True)
         yield from bps.kickoff(motor, wait=True)
 
         # Needs to wait for each flyable object to complete.
-        yield from bps.complete_all(motor, panda_pcomp, panda, wait=True)
+        yield from bps.complete_all(motor, panda_pcomp, panda, detector, wait=True)
 
     yield from inner_plan()

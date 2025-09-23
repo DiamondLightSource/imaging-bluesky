@@ -15,7 +15,7 @@ description = "Bluesky plans and tools for the Imaging Group"
 dependencies = [
     "bluesky",
     "ophyd",
-    "ophyd_async",
+    "ophyd_async == v0.13.3",
     "pandas",
     "ipython",
     "matplotlib",

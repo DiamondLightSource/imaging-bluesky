@@ -15,7 +15,7 @@ description = "Bluesky plans and tools for the Imaging Group"
 dependencies = [
     "bluesky",
     "ophyd",
-    "ophyd_async @ git+https://github.com/bluesky/ophyd-async.git",
+    "ophyd_async @ git+https://github.com/bluesky/ophyd-async.git#egg=1104_quantize_gap",
     "pandas",
     "matplotlib",
     "databroker",

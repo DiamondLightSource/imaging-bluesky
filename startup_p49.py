@@ -8,26 +8,26 @@ from dodal.common.visit import (
     LocalDirectoryServiceClient,
     StaticVisitPathProvider,
 )
-from dodal.utils import BeamlinePrefix, get_beamline_name
 from ophyd_async.plan_stubs import ensure_connected
 
-from imaging_bluesky.p49.devices.devices import panda
-from imaging_bluesky.p49.devices.stages import Stages
+from imaging_bluesky.p49.devices import BL, alignment_stages, detector, panda
 
-BL = get_beamline_name("p49")
-PREFIX = BeamlinePrefix(BL)
+# The following line is necessary so that the iPython terminal can access the plan
+from imaging_bluesky.p49.plans.panda_plan import fly_scan  # noqa: F401
 
 set_path_provider(
     StaticVisitPathProvider(
-        get_beamline_name("p49"),
+        BL,
         Path("/exports/mybeamline/data"),
         client=LocalDirectoryServiceClient(),
     )
 )
 
 
-stages = Stages(PREFIX.beamline_prefix)
-panda_device = panda(PREFIX.beamline_prefix)
+stages = alignment_stages()
+panda_device = panda()
+aravis = detector()
+
 
 RE = RunEngine()
-RE(ensure_connected(stages, panda_device))
+RE(ensure_connected(stages, panda_device, aravis))

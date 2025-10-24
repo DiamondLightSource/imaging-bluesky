@@ -26,6 +26,7 @@ from ophyd_async.epics.pmac import (
 )
 from ophyd_async.fastcs.panda import (
     HDFPanda,
+    PosOutScaleOffset,
     ScanSpecInfo,
     ScanSpecSeqTableTriggerLogic,
     SeqTable,
@@ -82,19 +83,19 @@ def no_panda():
     # Defining the frlyers and components of the scan
     motor_x = Motor(prefix="BL13J-MO-PI-02:X", name="Motor_X")
     motor_y = Motor(prefix="BL13J-MO-PI-02:Y", name="Motor_Y")
-    motor_t = Motor(prefix="BL13J-MO-STAGE-01:THETA", name="Motor_T")
+    # motor_t = Motor(prefix="BL13J-MO-STAGE-01:THETA", name="Motor_T")
 
     pmac = PmacIO(
         prefix="BL13J-MO-STEP-25:",
-        raw_motors=[motor_y, motor_t],
+        raw_motors=[motor_y, motor_x],
         coord_nums=[1],
         name="pmac",
     )
 
-    yield from ensure_connected(pmac, motor_t, motor_y)
+    yield from ensure_connected(pmac, motor_x, motor_y)
 
     # Prepare motor info using trajectory scanning
-    spec = Fly(1.0 @ (Line(motor_y, 0, 1, 10) * Line(motor_x, 0, 1, 10)))
+    spec = Fly(0.001 @ (Line(motor_y, -5, 5, 11) * Line(motor_x, -50, 50, 1001)))
 
     trigger_logic = spec
     pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
@@ -231,13 +232,13 @@ def panda_scan_time_based():
         path_provider=provider,
         name="panda02",
     )
-    motor_x = Motor(prefix="BL13J-MO-PI-02:X", name="Motor_X")
+    # motor_x = Motor(prefix="BL13J-MO-PI-02:X", name="Motor_X")
     motor_y = Motor(prefix="BL13J-MO-PI-02:Y", name="Motor_Y")
-    # motor_t = Motor(prefix="BL13J-MO-STAGE-01:THETA", name="Motor_T")
+    motor_t = Motor(prefix="BL13J-MO-STAGE-01:THETA", name="Motor_T")
 
     pmac = PmacIO(
         prefix="BL13J-MO-STEP-25:",
-        raw_motors=[motor_y, motor_x],
+        raw_motors=[motor_y, motor_t],
         coord_nums=[1],
         name="pmac",
     )
@@ -249,18 +250,18 @@ def panda_scan_time_based():
     # )
     detector = bl13j.merlin()
 
-    yield from ensure_connected(pmac, motor_y, motor_x, panda02, detector)
+    yield from ensure_connected(pmac, motor_y, motor_t, panda02, detector)
 
     # Prepare motor info using trajectory scanning
-    scan_frame_duration = 0.02
-    num_x = 101
-    num_y = 21
+    scan_frame_duration = 1.0
+    num_x = 500
+    num_y = 4
     spec = Fly(
         scan_frame_duration
-        @ (Line(motor_y, -20, 20, num_y) * Line(motor_x, -5, 5, num_x))
+        @ (Line(motor_y, -20, 20, num_y) * ~Line(motor_t, -5, 5, num_x))
     )
 
-    detector_deadtime = 2e-3
+    detector_deadtime = 2e-3 * 1.01
     total = num_x * num_y
     print(total)
 
@@ -275,11 +276,7 @@ def panda_scan_time_based():
         ScanSpecSeqTableTriggerLogic(
             table,
             {
-                # motor_x: PosOutScaleOffset(
-                #     "INENC4.VAL",
-                #     p.inenc[4].val_scale,  # type: ignore
-                #     p.inenc[4].val_offset,  # type: ignore
-                # ),
+                motor_t: PosOutScaleOffset.from_inenc(panda=panda02, number=4)
                 # motor_y: PosOutScaleOffset(
                 #     "INENC3.VAL",
                 #     p.inenc[3].val_scale,  # type: ignore
@@ -307,7 +304,9 @@ def panda_scan_time_based():
 
     @attach_data_session_metadata_decorator()
     @bpp.run_decorator()
-    @bpp.stage_decorator([panda02, panda_trigger_logic])
+    @bpp.stage_decorator(
+        [panda02, panda_trigger_logic, detector, pmac_trajectory_flyer]
+    )
     def inner_plan():
         # Prepare pmac with the trajectory
         yield from bps.prepare(pmac_trajectory_flyer, trigger_logic, wait=True)
@@ -318,14 +317,20 @@ def panda_scan_time_based():
         # prepare detector and info
         yield from bps.prepare(detector, detector_info, wait=True)
 
+        # Need to run this after detectors are prepared
+        yield from bps.declare_stream(panda02, detector, name="primary", collect=True)
+
         # kickoff devices waiting for all of them
         yield from bps.kickoff(panda02, wait=True)
         yield from bps.kickoff(panda_trigger_logic, wait=True)
         yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
         yield from bps.kickoff(detector, wait=True)
 
-        yield from bps.complete_all(
-            pmac_trajectory_flyer, panda02, panda_trigger_logic, detector, wait=True
+        yield from bps.collect_while_completing(
+            flyers=[pmac_trajectory_flyer, panda_trigger_logic, panda02, detector],
+            dets=[panda02, detector],
+            flush_period=0.5,
+            stream_name="primary",
         )
 
     yield from inner_plan()

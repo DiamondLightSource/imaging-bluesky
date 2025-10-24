@@ -26,7 +26,6 @@ from ophyd_async.epics.pmac import (
 )
 from ophyd_async.fastcs.panda import (
     HDFPanda,
-    PosOutScaleOffset,
     ScanSpecInfo,
     ScanSpecSeqTableTriggerLogic,
     SeqTable,
@@ -95,7 +94,7 @@ def no_panda():
     yield from ensure_connected(pmac, motor_x, motor_y)
 
     # Prepare motor info using trajectory scanning
-    spec = Fly(0.001 @ (Line(motor_y, -5, 5, 11) * Line(motor_x, -50, 50, 1001)))
+    spec = Fly(0.01 @ (Line(motor_y, -5, 5, 11) * Line(motor_x, -5, 5, 11)))
 
     trigger_logic = spec
     pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
@@ -253,7 +252,7 @@ def panda_scan_time_based():
     yield from ensure_connected(pmac, motor_y, motor_t, panda02, detector)
 
     # Prepare motor info using trajectory scanning
-    scan_frame_duration = 1.0
+    scan_frame_duration = 0.01
     num_x = 500
     num_y = 4
     spec = Fly(
@@ -276,12 +275,7 @@ def panda_scan_time_based():
         ScanSpecSeqTableTriggerLogic(
             table,
             {
-                motor_t: PosOutScaleOffset.from_inenc(panda=panda02, number=4)
-                # motor_y: PosOutScaleOffset(
-                #     "INENC3.VAL",
-                #     p.inenc[3].val_scale,  # type: ignore
-                #     p.inenc[3].val_offset,  # type: ignore
-                # ),
+                # motor_t: PosOutScaleOffset.from_inenc(panda=panda02, number=4)
             },
         )
     )
@@ -309,18 +303,20 @@ def panda_scan_time_based():
     )
     def inner_plan():
         # Prepare pmac with the trajectory
-        yield from bps.prepare(pmac_trajectory_flyer, trigger_logic, wait=True)
+        yield from bps.prepare(pmac_trajectory_flyer, trigger_logic)
         # prepare sequencer table
-        yield from bps.prepare(panda_trigger_logic, info, wait=True)
+        yield from bps.prepare(panda_trigger_logic, info)
         # prepare panda and hdf writer once, at start of scan
-        yield from bps.prepare(panda02, panda_hdf_info, wait=True)
+        yield from bps.prepare(panda02, panda_hdf_info)
         # prepare detector and info
+        # waiting for this last prepare means all prepare functions will be complete
         yield from bps.prepare(detector, detector_info, wait=True)
 
         # Need to run this after detectors are prepared
         yield from bps.declare_stream(panda02, detector, name="primary", collect=True)
 
-        # kickoff devices waiting for all of them
+        # kickoff devices waiting for all of them??
+        # start the detectors and hdf writers acquiring and set start moving the motors
         yield from bps.kickoff(panda02, wait=True)
         yield from bps.kickoff(panda_trigger_logic, wait=True)
         yield from bps.kickoff(pmac_trajectory_flyer, wait=True)

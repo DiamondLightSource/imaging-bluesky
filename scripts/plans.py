@@ -280,11 +280,13 @@ def panda_scan_time_based():
         )
     )
 
+    scan_frame_livetime = scan_frame_duration - detector_deadtime
+
     # Prepare Panda file writer trigger info
     panda_hdf_info = TriggerInfo(
         number_of_events=total,
         trigger=DetectorTrigger.CONSTANT_GATE,
-        livetime=scan_frame_duration - detector_deadtime,
+        livetime=scan_frame_livetime,
         deadtime=detector_deadtime,
     )
 
@@ -292,9 +294,12 @@ def panda_scan_time_based():
     detector_info = TriggerInfo(
         number_of_events=total,
         trigger=DetectorTrigger.CONSTANT_GATE,
-        livetime=scan_frame_duration - detector_deadtime,
+        livetime=scan_frame_livetime,
         deadtime=detector_deadtime,
     )
+
+    detector.drv.acquire_time.set(scan_frame_livetime)
+    detector.drv.acquire_period.set(scan_frame_duration)
 
     @attach_data_session_metadata_decorator()
     @bpp.run_decorator()

@@ -1,3 +1,4 @@
+# from collections.abc import Hashable
 from pathlib import Path
 
 import bluesky.plan_stubs as bps
@@ -11,7 +12,8 @@ from dodal.common.visit import (
     StaticVisitPathProvider,
 )
 from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
-from dodal.utils import BeamlinePrefix, get_beamline_name
+
+# from dodal.utils import BeamlinePrefix, get_beamline_name
 from ophyd_async.core import (
     DetectorTrigger,
     StandardFlyer,
@@ -38,26 +40,15 @@ from ophyd_async.plan_stubs import (
 )
 from scanspec.specs import Fly, Line
 
-# get_beamline_name with no arguments to get the
-# default BL name (from $BEAMLINE)
-BL = get_beamline_name("p99")
-PREFIX = BeamlinePrefix(BL)
+BL = bl13j.BL
+PREFIX = bl13j.PREFIX
 PATH = "/dls/i13-1/data/2025/cm40629-5/tmp"
-
-
-# @device_factory()
-# def panda() -> HDFPanda:
-#     return HDFPanda(
-#         f"{PREFIX.beamline_prefix}-MO-PANDA-01:",
-#         path_provider=get_path_provider(),
-#         name="panda",
-#     )
 
 
 set_path_provider(
     StaticVisitPathProvider(
         BL,
-        Path("/dls/i13-1/data/2025/cm40629-5/tmp"),
+        Path(PATH),
         client=LocalDirectoryServiceClient(),
     )
 )
@@ -79,7 +70,7 @@ set_path_provider(
 
 
 def no_panda():
-    # Defining the frlyers and components of the scan
+    # Defining the flyers and components of the scan
     motor_x = Motor(prefix="BL13J-MO-PI-02:X", name="Motor_X")
     motor_y = Motor(prefix="BL13J-MO-PI-02:Y", name="Motor_Y")
     # motor_t = Motor(prefix="BL13J-MO-STAGE-01:THETA", name="Motor_T")
@@ -119,7 +110,7 @@ data_dir = "/dls/i13-1/data/2025/cm40629-5/tmp"
 def panda_scan(start: float, stop: float, num: int, duration: float):
     provider = StaticPathProvider(UUIDFilenameProvider(), Path(data_dir))
     p = HDFPanda(
-        "BL13J-TS-PANDA-02",
+        "BL13J-MO-PANDA-02",
         path_provider=provider,
         name="panda",
     )
@@ -227,7 +218,7 @@ data_dir = "/dls/i13-1/data/2025/cm40629-5/tmp"
 def panda_scan_time_based():
     provider = StaticPathProvider(UUIDFilenameProvider(), Path(data_dir))
     panda02 = HDFPanda(
-        "BL13J-TS-PANDA-02:",
+        "BL13J-MO-PANDA-02:",
         path_provider=provider,
         name="panda02",
     )
@@ -241,23 +232,17 @@ def panda_scan_time_based():
         coord_nums=[1],
         name="pmac",
     )
-    # detector = AravisDetector(
-    #     "BL01C-DI-DCAM-02:",
-    #     path_provider=provider,
-    #     drv_suffix="CAM:",
-    #     fileio_suffix="HDF5:",
-    # )
     detector = bl13j.merlin()
 
     yield from ensure_connected(pmac, motor_y, motor_t, panda02, detector)
 
     # Prepare motor info using trajectory scanning
     scan_frame_duration = 0.01
-    num_x = 500
+    num_x = 50
     num_y = 4
     spec = Fly(
         scan_frame_duration
-        @ (Line(motor_y, -20, 20, num_y) * ~Line(motor_t, -5, 5, num_x))
+        @ (Line(motor_y, -20, 20, num_y) * ~Line(motor_t, -2, 2, num_x))
     )
 
     detector_deadtime = 2e-3 * 1.01
@@ -269,7 +254,7 @@ def panda_scan_time_based():
     pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
     table = panda02.seq[1]
 
-    info = ScanSpecInfo(spec=spec, deadtime=detector_deadtime)
+    scan_spec_info = ScanSpecInfo(spec=spec, deadtime=detector_deadtime)
 
     panda_trigger_logic = StandardFlyer(
         ScanSpecSeqTableTriggerLogic(
@@ -307,10 +292,13 @@ def panda_scan_time_based():
         [panda02, panda_trigger_logic, detector, pmac_trajectory_flyer]
     )
     def inner_plan():
+        # create a group that is waited for
+        # Hashable prepare_group = ["pmac_trajectory_flyer", "trigger_logic"]
+
         # Prepare pmac with the trajectory
         yield from bps.prepare(pmac_trajectory_flyer, trigger_logic)
         # prepare sequencer table
-        yield from bps.prepare(panda_trigger_logic, info)
+        yield from bps.prepare(panda_trigger_logic, scan_spec_info)
         # prepare panda and hdf writer once, at start of scan
         yield from bps.prepare(panda02, panda_hdf_info)
         # prepare detector and info
@@ -320,13 +308,18 @@ def panda_scan_time_based():
         # Need to run this after detectors are prepared
         yield from bps.declare_stream(panda02, detector, name="primary", collect=True)
 
-        # kickoff devices waiting for all of them??
-        # start the detectors and hdf writers acquiring and set start moving the motors
-        yield from bps.kickoff(panda02, wait=True)
-        yield from bps.kickoff(panda_trigger_logic, wait=True)
-        yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
+        # Start the detectors and hdf writers acquiring.
+        # Configure the panda (seq table triggering).
+        # create a group that is waited for before pmac_trajectory_flyer kicked off on
+        # its own with wait=true.
+        yield from bps.kickoff(panda02)
+        yield from bps.kickoff(panda_trigger_logic)
         yield from bps.kickoff(detector, wait=True)
 
+        # Start the trajectory.
+        yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
+
+        # Wait for the scan to complete whilst continuously collecting the data.
         yield from bps.collect_while_completing(
             flyers=[pmac_trajectory_flyer, panda_trigger_logic, panda02, detector],
             dets=[panda02, detector],

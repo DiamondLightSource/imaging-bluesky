@@ -245,7 +245,22 @@ def panda_scan_time_based():
     detector = bl13j.merlin()
     yield from ensure_connected(pmac, pi, theta, panda02, detector)
 
-    # Prepare motor info using trajectory scanning
+    pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
+    pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
+
+    # Use PosOutScaleOffset if want to compare position after start of row (GPIO) signal
+    # from pmac trajectory motion program.
+    table = panda02.seq[1]
+    panda_trigger_logic = StandardFlyer(
+        ScanSpecSeqTableTriggerLogic(
+            table,
+            {
+                # motor_t: PosOutScaleOffset.from_inenc(panda=panda02, number=4)
+            },
+        )
+    )
+
+    # Scan spec currently defined here but will be parametrised.
     scan_frame_duration = 0.01
     num_fast_axis_pts = 500
     num_slow_axis_pts = 5
@@ -257,46 +272,31 @@ def panda_scan_time_based():
         )
     )
 
+    # detector_deadtime currently definied here
+    # - should get from the detector (for the Merlin this is based on mode).
     detector_deadtime = 0.05e-3  # 12bit 0.5e-3.  24bit: 2e-3 * 1.01
+
+    # scan_spec_info and trigger_logic are now created from spec.
     tot_frames = num_fast_axis_pts * num_slow_axis_pts
     print(f"Total frames = {tot_frames}")
-
-    pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
-    pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
-
     scan_spec_info = ScanSpecInfo(spec=spec, deadtime=detector_deadtime)
-
     trigger_logic = spec
-    table = panda02.seq[1]
-    panda_trigger_logic = StandardFlyer(
-        ScanSpecSeqTableTriggerLogic(
-            table,
-            {
-                # motor_t: PosOutScaleOffset.from_inenc(panda=panda02, number=4)
-            },
-        )
-    )
 
+    # Prepare panda and detector file writer trigger info based on spec.
+    # - should get tot_frames from spec.
     scan_frame_livetime = scan_frame_duration - detector_deadtime
-
-    # Prepare Panda file writer trigger info
     panda_hdf_info = TriggerInfo(
         number_of_events=tot_frames,
         trigger=DetectorTrigger.CONSTANT_GATE,
         livetime=scan_frame_livetime,
         deadtime=detector_deadtime,
     )
-
-    # Prepare Panda file writer trigger info
     detector_info = TriggerInfo(
         number_of_events=tot_frames,
         trigger=DetectorTrigger.CONSTANT_GATE,
         livetime=scan_frame_livetime,
         deadtime=detector_deadtime,
     )
-
-    detector.drv.acquire_time.set(scan_frame_livetime)
-    detector.drv.acquire_period.set(scan_frame_duration)
 
     @attach_data_session_metadata_decorator()
     @bpp.run_decorator()

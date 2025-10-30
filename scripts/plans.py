@@ -127,11 +127,11 @@ class common_plan_components:
         self.pmac_trajectory_flyer = StandardFlyer(self.pmac_trajectory)
 
         # ToDo: Scan spec currently defined here but will be parametrised.
-        self.scan_frame_duration = 0.01
-        num_fast_axis_pts = 100
+        self.scan_frame_duration = 0.005
+        num_fast_axis_pts = 1000
         num_slow_axis_pts = 5
         x_start = -5
-        x_stop = 5
+        x_stop = 4.9
         self.spec = Fly(
             self.scan_frame_duration
             @ (
@@ -143,10 +143,11 @@ class common_plan_components:
 
         self.tot_frames = num_fast_axis_pts * num_slow_axis_pts
         print(
-            f"Total frames = {self.tot_frames}\n"
-            f"Exposure time = {self.tot_frames * self.scan_frame_duration}s\n"
-            f"Scan demanded fast axis velocity = "
+            f"Scan demanded fast axis:  n={num_fast_axis_pts}, pos=({x_start}, "
+            f"{x_stop}), vel="
             f"{(x_stop - x_start) / num_fast_axis_pts / self.scan_frame_duration}"
+            f"Exposure time:\t\t  {self.tot_frames}*{self.scan_frame_duration} = "
+            f"{self.tot_frames * self.scan_frame_duration}s\n"
         )
 
     def trig_info(self, deadtime: float):

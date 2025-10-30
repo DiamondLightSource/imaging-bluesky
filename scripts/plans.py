@@ -260,9 +260,9 @@ def panda_scan_time_based():
         )
     )
 
-    # Scan spec currently defined here but will be parametrised.
+    # ToDo: Scan spec currently defined here but will be parametrised.
     scan_frame_duration = 0.01
-    num_fast_axis_pts = 500
+    num_fast_axis_pts = 50
     num_slow_axis_pts = 5
     spec = Fly(
         scan_frame_duration
@@ -272,18 +272,19 @@ def panda_scan_time_based():
         )
     )
 
-    # detector_deadtime currently definied here
-    # - should get from the detector (for the Merlin this is based on mode).
-    detector_deadtime = 0.05e-3  # 12bit 0.5e-3.  24bit: 2e-3 * 1.01
+    # detector_deadtime needs to be increased slightly to allow for the internal panda
+    # clock not being precisely synced with the detectors.  Without this the detector
+    # will generally miss every other frame.
+    detector_deadtime = detector._controller.get_deadtime(0) * 1.005  # noqa: SLF001
 
-    # scan_spec_info and trigger_logic are now created from spec.
+    # scan_spec_info and trigger_logic are now defined based on spec (and det deadtime).
     tot_frames = num_fast_axis_pts * num_slow_axis_pts
     print(f"Total frames = {tot_frames}")
     scan_spec_info = ScanSpecInfo(spec=spec, deadtime=detector_deadtime)
     trigger_logic = spec
 
-    # Prepare panda and detector file writer trigger info based on spec.
-    # - should get tot_frames from spec.
+    # Prepare trigger info for panda and detector file writers based on scan definition.
+    # ToDo: Should get tot_frames from spec.
     scan_frame_livetime = scan_frame_duration - detector_deadtime
     panda_hdf_info = TriggerInfo(
         number_of_events=tot_frames,
@@ -304,29 +305,23 @@ def panda_scan_time_based():
         [pmac_trajectory_flyer, panda_trigger_logic, panda02, detector]
     )
     def inner_plan():
-        # create a group that is waited for
-        # Hashable prepare_group = ["pmac_trajectory_flyer", "trigger_logic"]
-
         # Prepare pmac with the trajectory
-        yield from bps.prepare(pmac_trajectory_flyer, trigger_logic)
+        yield from bps.prepare(pmac_trajectory_flyer, trigger_logic, group="sync_prep")
         # prepare sequencer table
-        yield from bps.prepare(panda_trigger_logic, scan_spec_info)
+        yield from bps.prepare(panda_trigger_logic, scan_spec_info, group="sync_prep")
         # prepare panda and hdf writer once, at start of scan
-        yield from bps.prepare(panda02, panda_hdf_info)
+        yield from bps.prepare(panda02, panda_hdf_info, group="sync_prep")
         # prepare detector and info
-        # waiting for this last prepare means all prepare functions will be complete
-        yield from bps.prepare(detector, detector_info, wait=True)
+        yield from bps.prepare(detector, detector_info, group="sync_prep", wait=True)
 
         # Need to run this after detectors are prepared
         yield from bps.declare_stream(panda02, detector, name="primary", collect=True)
 
-        # Start the detectors and hdf writers acquiring.
         # Configure the panda (seq table triggering).
-        # create a group that is waited for before pmac_trajectory_flyer kicked off on
-        # its own with wait=true.
-        yield from bps.kickoff(panda_trigger_logic)
-        yield from bps.kickoff(panda02)
-        yield from bps.kickoff(detector, wait=True)
+        # Start the detectors and hdf writers acquiring.
+        yield from bps.kickoff(panda_trigger_logic, group="sync_kickoff")
+        yield from bps.kickoff(panda02, group="sync_kickoff")
+        yield from bps.kickoff(detector, group="sync_kickoff", wait=True)
 
         # Start the trajectory.
         yield from bps.kickoff(pmac_trajectory_flyer, wait=True)

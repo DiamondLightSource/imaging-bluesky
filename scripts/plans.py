@@ -17,11 +17,10 @@ from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
     StandardFlyer,
-    StaticPathProvider,
+    # StaticPathProvider,
     TriggerInfo,
-    UUIDFilenameProvider,
+    # UUIDFilenameProvider,
 )
-from ophyd_async.epics.motor import Motor
 from ophyd_async.epics.pmac import (
     PmacTrajectoryTriggerLogic,
     # PmacIO,
@@ -30,10 +29,6 @@ from ophyd_async.fastcs.panda import (
     # HDFPanda,
     ScanSpecInfo,
     ScanSpecSeqTableTriggerLogic,
-    SeqTable,
-    SeqTableInfo,
-    SeqTrigger,
-    StaticSeqTableTriggerLogic,
 )
 from ophyd_async.plan_stubs import (
     ensure_connected,
@@ -53,13 +48,14 @@ set_path_provider(
     )
 )
 
-
+# ----------------------------------
+# Below could be useful for testing.
+# ----------------------------------
 # def test_store_settings():
 #     p = panda()
 #     yield from ensure_connected(p)
 #     provider = YamlSettingsProvider("./scripts/layouts")
 #     yield from store_settings(provider, "seq_table", p)
-
 
 # def test_restore_settings():
 #     p = panda()
@@ -69,267 +65,266 @@ set_path_provider(
 #     yield from apply_panda_settings(settings)
 
 
-def no_panda():
-    # Local devices no longer needed now using dodal/beamlines/i13_1:
-    # pmac = PmacIO(
-    #     prefix="BL13J-MO-STEP-25:",
-    #     raw_motors=[motor_y, motor_x],
-    #     coord_nums=[1],
-    #     name="pmac",
-    # )
+# ----------------------------------
+# Populate panda sequence table for 1D pcomp scan.
+# Use with StaticSeqTableTriggerLogic (instead of ScanSpecSeqTableTriggerLogic):
+# panda_trigger_logic = StandardFlyer(StaticSeqTableTriggerLogic(plan.panda02.seq[1]))
+# ----------------------------------
+# motor_t_mres = 1e-04
+# table = SeqTable()  # type: ignore
+# positions = [int(n / motor_t_mres) for n in plan.spec.frames().lower[plan.theta]]
+# direction = (
+#     SeqTrigger.POSA_LT
+#     if start * motor_t_mres > stop * motor_t_mres
+#     else SeqTrigger.POSA_GT
+# )
+# table += SeqTable.row(
+#     repeats=1,
+#     trigger=SeqTrigger.BITA_0,
+# )
+# table += SeqTable.row(
+#     repeats=1,
+#     trigger=SeqTrigger.BITA_1,
+# )
+# counter = 0
+# for pos in positions:
+#     if counter == num:
+#         table += SeqTable.row(
+#             repeats=1,
+#             trigger=SeqTrigger.BITA_0,
+#         )
+#         table += SeqTable.row(
+#             repeats=1,
+#             trigger=SeqTrigger.BITA_1,
+#         )
+#         counter = 0
 
-    # Defining the flyers and components of the scan
-    motor_x = Motor(prefix="BL13J-MO-PI-02:X", name="Motor_X")
-    motor_y = Motor(prefix="BL13J-MO-PI-02:Y", name="Motor_Y")
-    motor_t = Motor(prefix="BL13J-MO-STAGE-01:THETA", name="Motor_T")
-
-    pmac = bl13j.step_25()
-
-    yield from ensure_connected(pmac, motor_x, motor_y, motor_t)
-
-    # Prepare motor info using trajectory scanning
-    spec = Fly(0.01 @ (Line(motor_y, -5, 5, 11) * Line(motor_x, -5, 5, 11)))
-
-    trigger_logic = spec
-    pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
-    pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
-
-    @bpp.run_decorator()
-    def inner_plan():
-        # Prepare pmac with the trajectory
-        yield from bps.prepare(pmac_trajectory_flyer, trigger_logic, wait=True)
-
-        # kickoff devices waiting for all of them
-        yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
-
-        yield from bps.complete_all(pmac_trajectory_flyer, wait=True)
-
-    yield from inner_plan()
+#     table += SeqTable.row(
+#         repeats=1,
+#         trigger=direction,
+#         position=pos,
+#         time1=1,
+#         outa1=True,
+#         time2=1,
+#         outa2=False,
+#     )
+#     counter += 1
+# seq_table_info = SeqTableInfo(sequence_table=table, repeats=1, prescale_as_us=1)
+# ----------------------------------
 
 
-def panda_scan(start: float, stop: float, num: int, duration: float):
-    # Local devices no longer needed now using dodal/beamlines/i13_1:
-    # provider = StaticPathProvider(UUIDFilenameProvider(), Path(PATH))
-    # pmac = PmacIO(
-    #     prefix="BL13J-MO-STEP-25:",
-    #     raw_motors=[motor_y, motor_t],
-    #     coord_nums=[1],
-    #     name="pmac",
-    # )
-    # panda02 = HDFPanda(
-    #     "BL13J-MO-PANDA-02",
-    #     path_provider=provider,
-    #     name="panda",
-    # )
+class common_plan_components:
+    """"""
 
-    pmac = bl13j.step_25()
-    motor_x = Motor(prefix="BL13J-MO-PI-02:X", name="Motor_X")
-    motor_y = Motor(prefix="BL13J-MO-PI-02:Y", name="Motor_Y")
-    motor_t = Motor(prefix="BL13J-MO-STAGE-01:THETA", name="Motor_T")
-    panda02 = bl13j.panda_02()
+    def __init__(self):
+        self.pmac = bl13j.step_25()
+        self.pi = bl13j.sample_xyz()
+        self.theta = bl13j.theta()
+        self.panda02 = bl13j.panda_02()
+        self.detector = bl13j.merlin()
 
-    yield from ensure_connected(pmac, motor_x, motor_y, motor_t, panda02)
+        self.pmac_trajectory = PmacTrajectoryTriggerLogic(self.pmac)
+        self.pmac_trajectory_flyer = StandardFlyer(self.pmac_trajectory)
 
-    panda_seq = StandardFlyer(StaticSeqTableTriggerLogic(panda02.seq[1]))
-
-    # Prepare motor info using trajectory scanningmerlin
-    spec = Fly(
-        float(duration)
-        @ (Line(motor_y, start, stop, num) * Line(motor_t, start, stop, num))
-    )
-
-    trigger_logic = spec
-    pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
-    pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
-
-    motor_t_mres = 1e-04
-
-    table = SeqTable()  # type: ignore
-    positions = [int(n / motor_t_mres) for n in spec.frames().lower[motor_t]]
-
-    direction = (
-        SeqTrigger.POSA_LT
-        if start * motor_t_mres > stop * motor_t_mres
-        else SeqTrigger.POSA_GT
-    )
-
-    table += SeqTable.row(
-        repeats=1,
-        trigger=SeqTrigger.BITA_0,
-    )
-    table += SeqTable.row(
-        repeats=1,
-        trigger=SeqTrigger.BITA_1,
-    )
-
-    counter = 0
-    for pos in positions:
-        if counter == num:
-            table += SeqTable.row(
-                repeats=1,
-                trigger=SeqTrigger.BITA_0,
+        # ToDo: Scan spec currently defined here but will be parametrised.
+        self.scan_frame_duration = 0.01
+        num_fast_axis_pts = 100
+        num_slow_axis_pts = 5
+        x_start = -5
+        x_stop = 5
+        self.spec = Fly(
+            self.scan_frame_duration
+            @ (
+                Line(self.pi.y, -20, 20, num_slow_axis_pts)
+                * ~Line(self.pi.x, x_start, x_stop, num_fast_axis_pts)
             )
-            table += SeqTable.row(
-                repeats=1,
-                trigger=SeqTrigger.BITA_1,
-            )
-            counter = 0
+        )
+        self.spec_trigger_logic = self.spec
 
-        table += SeqTable.row(
-            repeats=1,
-            trigger=direction,
-            position=pos,
-            time1=1,
-            outa1=True,
-            time2=1,
-            outa2=False,
+        self.tot_frames = num_fast_axis_pts * num_slow_axis_pts
+        print(
+            f"Total frames = {self.tot_frames}\n"
+            f"Exposure time = {self.tot_frames * self.scan_frame_duration}s\n"
+            f"Scan demanded fast axis velocity = "
+            f"{(x_stop - x_start) / num_fast_axis_pts / self.scan_frame_duration}"
         )
 
-        counter += 1
-    seq_table_info = SeqTableInfo(sequence_table=table, repeats=1, prescale_as_us=1)
+    def trig_info(self, deadtime: float):
+        """Create file writer info based on scan definition (using TriggerInfo)."""
+        # ToDo: Should get tot_frames from spec.
+        return TriggerInfo(
+            number_of_events=self.tot_frames,
+            trigger=DetectorTrigger.CONSTANT_GATE,
+            livetime=self.scan_frame_duration - deadtime,
+            deadtime=deadtime,
+        )
 
-    # Prepare Panda file writer trigger info
-    panda_hdf_info = TriggerInfo(
-        number_of_events=num * num,
-        trigger=DetectorTrigger.CONSTANT_GATE,
-        livetime=duration,
-        deadtime=0.001,
-    )
+
+def just_traj_scan():
+    """"""
+
+    plan = common_plan_components()
+    yield from ensure_connected(plan.pmac, plan.pi)
 
     @attach_data_session_metadata_decorator()
+    @bpp.stage_decorator(
+        [
+            plan.pmac_trajectory_flyer,
+        ]
+    )
     @bpp.run_decorator()
-    @bpp.stage_decorator([panda02, panda_seq])
     def inner_plan():
         # Prepare pmac with the trajectory
-        yield from bps.prepare(pmac_trajectory_flyer, trigger_logic, wait=True)
+        yield from bps.prepare(
+            plan.pmac_trajectory_flyer, plan.spec_trigger_logic, wait=True
+        )
+
+        # Start the trajectory.
+        yield from bps.kickoff(plan.pmac_trajectory_flyer, wait=True)
+
+        yield from bps.complete_all(plan.pmac_trajectory_flyer, wait=True)
+
+    yield from inner_plan()
+
+
+def traj_panda_scan():
+    """"""
+
+    plan = common_plan_components()
+    yield from ensure_connected(plan.pmac, plan.pi, plan.theta, plan.panda02)
+
+    panda_trigger_logic = StandardFlyer(
+        ScanSpecSeqTableTriggerLogic(plan.panda02.seq[1])
+    )
+
+    panda_deadtime = plan.panda02._controller.get_deadtime(0)  # noqa: SLF001
+
+    # scan_spec_info is defined based on spec and det deadtime.
+    scan_spec_info = ScanSpecInfo(spec=plan.spec, deadtime=panda_deadtime)
+
+    # Create panda file writer info based on spec and det deadtime.
+    panda_hdf_info = plan.trig_info(panda_deadtime)
+
+    @attach_data_session_metadata_decorator()
+    @bpp.stage_decorator(
+        [
+            plan.pmac_trajectory_flyer,
+            panda_trigger_logic,
+            plan.panda02,
+        ]
+    )
+    @bpp.run_decorator()
+    def inner_plan():
+        # Prepare pmac with the trajectory
+        yield from bps.prepare(
+            plan.pmac_trajectory_flyer, plan.spec_trigger_logic, group="sync_prep"
+        )
         # prepare sequencer table
-        yield from bps.prepare(panda_seq, seq_table_info, wait=True)
-        # prepare panda and hdf writer once, at start of scan
-        yield from bps.prepare(panda02, panda_hdf_info, wait=True)
+        yield from bps.prepare(panda_trigger_logic, scan_spec_info, group="sync_prep")
+        # prepare panda and hdf writer
+        yield from bps.prepare(
+            plan.panda02, panda_hdf_info, group="sync_prep", wait=True
+        )
 
-        # kickoff devices waiting for all of them
-        yield from bps.kickoff(panda02, wait=True)
-        yield from bps.kickoff(panda_seq, wait=True)
-        yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
+        # Need to run this after detectors are prepared
+        yield from bps.declare_stream(plan.panda02, name="primary", collect=True)
 
-        yield from bps.complete_all(
-            pmac_trajectory_flyer, panda02, panda_seq, wait=True
+        # ??? (seq table triggering).
+        # Start the detectors and hdf writers acquiring.
+        yield from bps.kickoff(plan.panda02, group="sync_kickoff")
+        yield from bps.kickoff(panda_trigger_logic, group="sync_kickoff", wait=True)
+
+        # Start the trajectory.
+        yield from bps.kickoff(plan.pmac_trajectory_flyer, wait=True)
+
+        yield from bps.collect_while_completing(
+            flyers=[plan.pmac_trajectory_flyer, panda_trigger_logic, plan.panda02],
+            dets=[plan.panda02],
+            flush_period=0.5,
+            stream_name="primary",
         )
 
     yield from inner_plan()
 
 
-def panda_scan_time_based():
-    # Local devices no longer needed now using dodal/beamlines/i13_1:
-    # provider = StaticPathProvider(UUIDFilenameProvider(), Path(PATH))
-    # panda02 = HDFPanda(
-    #     "BL13J-MO-PANDA-02:",
-    #     path_provider=provider,
-    #     name="panda02",
-    # )
-    # motor_x = Motor(prefix="BL13J-MO-PI-02:X", name="Motor_X")
-    # motor_y = Motor(prefix="BL13J-MO-PI-02:Y", name="Motor_Y")
-    # motor_t = Motor(prefix="BL13J-MO-STAGE-01:THETA", name="Motor_T")
-    # pmac = PmacIO(
-    #     prefix="BL13J-MO-STEP-25:",
-    #     raw_motors=[motor_x, motor_y, motor_t],
-    #     coord_nums=[1],
-    #     name="pmac",
-    # )
-    # yield from ensure_connected(pmac, motor_x, motor_y, motor_t, panda02, detector)
+def grid_scan():
+    """"""
 
-    pmac = bl13j.step_25()
-    pi = bl13j.sample_xyz()
-    theta = bl13j.theta()
-    panda02 = bl13j.panda_02()
-    detector = bl13j.merlin()
-    yield from ensure_connected(pmac, pi, theta, panda02, detector)
-
-    pmac_trajectory = PmacTrajectoryTriggerLogic(pmac)
-    pmac_trajectory_flyer = StandardFlyer(pmac_trajectory)
+    plan = common_plan_components()
+    yield from ensure_connected(
+        plan.pmac, plan.pi, plan.theta, plan.panda02, plan.detector
+    )
 
     # Use PosOutScaleOffset if want to compare position after start of row (GPIO) signal
     # from pmac trajectory motion program.
-    table = panda02.seq[1]
     panda_trigger_logic = StandardFlyer(
         ScanSpecSeqTableTriggerLogic(
-            table,
+            plan.panda02.seq[1],
             {
                 # motor_t: PosOutScaleOffset.from_inenc(panda=panda02, number=4)
             },
         )
     )
 
-    # ToDo: Scan spec currently defined here but will be parametrised.
-    scan_frame_duration = 0.01
-    num_fast_axis_pts = 50
-    num_slow_axis_pts = 5
-    spec = Fly(
-        scan_frame_duration
-        @ (
-            Line(pi.y, -20, 20, num_slow_axis_pts)
-            * ~Line(pi.x, -5, 5, num_fast_axis_pts)
-        )
-    )
-
     # detector_deadtime needs to be increased slightly to allow for the internal panda
     # clock not being precisely synced with the detectors.  Without this the detector
     # will generally miss every other frame.
-    detector_deadtime = detector._controller.get_deadtime(0) * 1.005  # noqa: SLF001
+    detector_deadtime = plan.detector._controller.get_deadtime(0) * 1.005  # noqa: SLF001
 
-    # scan_spec_info and trigger_logic are now defined based on spec (and det deadtime).
-    tot_frames = num_fast_axis_pts * num_slow_axis_pts
-    print(f"Total frames = {tot_frames}")
-    scan_spec_info = ScanSpecInfo(spec=spec, deadtime=detector_deadtime)
-    trigger_logic = spec
+    # scan_spec_info is defined based on spec and det deadtime.
+    scan_spec_info = ScanSpecInfo(spec=plan.spec, deadtime=detector_deadtime)
 
-    # Prepare trigger info for panda and detector file writers based on scan definition.
-    # ToDo: Should get tot_frames from spec.
-    scan_frame_livetime = scan_frame_duration - detector_deadtime
-    panda_hdf_info = TriggerInfo(
-        number_of_events=tot_frames,
-        trigger=DetectorTrigger.CONSTANT_GATE,
-        livetime=scan_frame_livetime,
-        deadtime=detector_deadtime,
-    )
-    detector_info = TriggerInfo(
-        number_of_events=tot_frames,
-        trigger=DetectorTrigger.CONSTANT_GATE,
-        livetime=scan_frame_livetime,
-        deadtime=detector_deadtime,
-    )
+    # Create panda and detector file writer infos based on spec and det deadtime.
+    panda_hdf_info = plan.trig_info(detector_deadtime)
+    detector_hdf_info = plan.trig_info(detector_deadtime)
 
     @attach_data_session_metadata_decorator()
-    @bpp.run_decorator()
     @bpp.stage_decorator(
-        [pmac_trajectory_flyer, panda_trigger_logic, panda02, detector]
+        [
+            plan.pmac_trajectory_flyer,
+            panda_trigger_logic,
+            plan.panda02,
+            plan.detector,
+        ]
     )
+    @bpp.run_decorator()
     def inner_plan():
         # Prepare pmac with the trajectory
-        yield from bps.prepare(pmac_trajectory_flyer, trigger_logic, group="sync_prep")
+        yield from bps.prepare(
+            plan.pmac_trajectory_flyer, plan.spec_trigger_logic, group="sync_prep"
+        )
         # prepare sequencer table
         yield from bps.prepare(panda_trigger_logic, scan_spec_info, group="sync_prep")
-        # prepare panda and hdf writer once, at start of scan
-        yield from bps.prepare(panda02, panda_hdf_info, group="sync_prep")
-        # prepare detector and info
-        yield from bps.prepare(detector, detector_info, group="sync_prep", wait=True)
+        # prepare panda and hdf writer
+        yield from bps.prepare(plan.panda02, panda_hdf_info, group="sync_prep")
+        # prepare detector and hdf writer
+        yield from bps.prepare(
+            plan.detector, detector_hdf_info, group="sync_prep", wait=True
+        )
 
         # Need to run this after detectors are prepared
-        yield from bps.declare_stream(panda02, detector, name="primary", collect=True)
+        yield from bps.declare_stream(
+            plan.panda02, plan.detector, name="primary", collect=True
+        )
 
-        # Configure the panda (seq table triggering).
+        # ??? (seq table triggering).
         # Start the detectors and hdf writers acquiring.
         yield from bps.kickoff(panda_trigger_logic, group="sync_kickoff")
-        yield from bps.kickoff(panda02, group="sync_kickoff")
-        yield from bps.kickoff(detector, group="sync_kickoff", wait=True)
+        yield from bps.kickoff(plan.panda02, group="sync_kickoff")
+        yield from bps.kickoff(plan.detector, group="sync_kickoff", wait=True)
 
         # Start the trajectory.
-        yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
+        yield from bps.kickoff(plan.pmac_trajectory_flyer, wait=True)
 
         # Wait for the scan to complete whilst continuously collecting the data.
         yield from bps.collect_while_completing(
-            flyers=[pmac_trajectory_flyer, panda_trigger_logic, panda02, detector],
-            dets=[panda02, detector],
+            flyers=[
+                plan.pmac_trajectory_flyer,
+                panda_trigger_logic,
+                plan.panda02,
+                plan.detector,
+            ],
+            dets=[plan.panda02, plan.detector],
             flush_period=0.5,
             stream_name="primary",
         )

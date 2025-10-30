@@ -127,26 +127,32 @@ class common_plan_components:
         self.pmac_trajectory_flyer = StandardFlyer(self.pmac_trajectory)
 
         # ToDo: Scan spec currently defined here but will be parametrised.
-        self.scan_frame_duration = 0.005
+        self.scan_frame_duration = 0.004
         num_fast_axis_pts = 1000
+        fast_axis_start = -5
+        fast_axis_stop = 4.9
         num_slow_axis_pts = 5
-        x_start = -5
-        x_stop = 4.9
         self.spec = Fly(
             self.scan_frame_duration
             @ (
                 Line(self.pi.y, -20, 20, num_slow_axis_pts)
-                * ~Line(self.pi.x, x_start, x_stop, num_fast_axis_pts)
+                * ~Line(self.pi.x, fast_axis_start, fast_axis_stop, num_fast_axis_pts)
             )
         )
         self.spec_trigger_logic = self.spec
 
         self.tot_frames = num_fast_axis_pts * num_slow_axis_pts
+
+        # Print scan params.
+        vel = (
+            (fast_axis_stop - fast_axis_start)
+            / num_fast_axis_pts
+            / self.scan_frame_duration
+        )
         print(
-            f"Scan demanded fast axis:  n={num_fast_axis_pts}, pos=({x_start}, "
-            f"{x_stop}), vel="
-            f"{(x_stop - x_start) / num_fast_axis_pts / self.scan_frame_duration}"
-            f"Exposure time:\t\t  {self.tot_frames}*{self.scan_frame_duration} = "
+            f"\nScan demanded fast axis:  n={num_fast_axis_pts}, pos=({fast_axis_start}"
+            f", {fast_axis_stop}), vel={vel}"
+            f"\nExposure time:\t\t  {self.tot_frames}*{self.scan_frame_duration} = "
             f"{self.tot_frames * self.scan_frame_duration}s\n"
         )
 

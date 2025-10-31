@@ -1,9 +1,9 @@
-# from collections.abc import Hashable
 from pathlib import Path
 
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
 import dodal.beamlines.i13_1 as bl13j
+import numpy as np
 from dodal.common.beamlines.beamline_utils import (
     set_path_provider,
 )
@@ -128,42 +128,60 @@ class CommonPlanComponents:
         self.pmac_trajectory = PmacTrajectoryTriggerLogic(self.pmac)
         self.pmac_trajectory_flyer = StandardFlyer(self.pmac_trajectory)
 
+        # Seperate scan spec for triggering as trajectory steps can't be <2*2ms.
         # ToDo: Scan spec currently defined here but will be parametrised.
-        self.scan_frame_duration = 0.004  # 0.004 fastest before unable to fill traj buffers in time (1000/8000).  # noqa: E501
-        num_fast_axis_pts = 100  # 1000, 8000
+        frame_duration_traj = 0.004  # 0.004 fastest before unable to fill traj buffers in time (1000/8000).  # noqa: E501
+        self.frame_duration_trig = 0.0001
+        num_fast_axis_pts = 1000  # 1000, 8000
         fast_axis_start = -5  #     -50
-        fast_axis_stop = 4.9  #        49
-        num_slow_axis_pts = 5  #       5, 50
+        fast_axis_stop = 4.9  #      49
+        num_slow_axis_pts = 5  #     5, 50
         self.spec_traj = Fly(
-            self.scan_frame_duration
+            frame_duration_traj
             @ (
                 Line(self.pi.y, -20, 20, num_slow_axis_pts)
                 * ~Line(self.pi.x, fast_axis_start, fast_axis_stop, num_fast_axis_pts)
             )
         )
+        num_fast_axis_pts_trig = num_fast_axis_pts * np.ceil(
+            frame_duration_traj / self.frame_duration_trig
+        )
+        self.spec_trig = Fly(
+            self.frame_duration_trig
+            @ (
+                Line(self.pi.y, -20, 20, num_slow_axis_pts)
+                * ~Line(
+                    self.pi.x,
+                    fast_axis_start,
+                    fast_axis_stop,
+                    num_fast_axis_pts_trig,
+                )
+            )
+        )
 
-        self.tot_frames = num_fast_axis_pts * num_slow_axis_pts
+        tot_frames_traj = num_fast_axis_pts * num_slow_axis_pts
+        self.tot_frames_trig = num_fast_axis_pts_trig * num_slow_axis_pts
 
         # Print scan params.
         vel = (
-            (fast_axis_stop - fast_axis_start)
-            / num_fast_axis_pts
-            / self.scan_frame_duration
+            (fast_axis_stop - fast_axis_start) / num_fast_axis_pts / frame_duration_traj
         )
         print(
             f"\nScan demanded fast axis:  n={num_fast_axis_pts}, pos=({fast_axis_start}"
             f", {fast_axis_stop}), vel={vel}"
-            f"\nExposure time:\t\t  {self.tot_frames}*{self.scan_frame_duration} = "
-            f"{self.tot_frames * self.scan_frame_duration}s\n"
+            f"\nTotal trajectory time:\t  {tot_frames_traj}*{frame_duration_traj} = "
+            f"{tot_frames_traj * frame_duration_traj}s\n"
+            f"Total exposure time:\t  {self.tot_frames_trig}*{self.frame_duration_trig}"
+            f" = {self.tot_frames_trig * self.frame_duration_trig}s\n"
         )
 
     def trig_info(self, deadtime: float):
         """Create file writer info based on scan definition (using TriggerInfo)."""
         # ToDo: Can't currrently get tot_frames from spec.
         return TriggerInfo(
-            number_of_events=self.tot_frames,
+            number_of_events=self.tot_frames_trig,
             trigger=DetectorTrigger.CONSTANT_GATE,
-            livetime=self.scan_frame_duration - deadtime,
+            livetime=self.frame_duration_trig - deadtime,
             deadtime=deadtime,
         )
 
@@ -207,7 +225,7 @@ def traj_panda_scan():
     panda_deadtime = plan.panda02._controller.get_deadtime(0)  # noqa: SLF001
 
     # spec info is defined based on spec and det deadtime.
-    spec_trig_info = ScanSpecInfo(spec=plan.spec_traj, deadtime=panda_deadtime)
+    spec_trig_info = ScanSpecInfo(spec=plan.spec_trig, deadtime=panda_deadtime)
 
     # Create panda file writer info based on spec and det deadtime.
     panda_hdf_info = plan.trig_info(panda_deadtime)
@@ -279,7 +297,7 @@ def grid_scan():
     detector_deadtime = plan.detector._controller.get_deadtime(0) * 1.005  # noqa: SLF001
 
     # spec info is defined based on spec and det deadtime.
-    spec_trig_info = ScanSpecInfo(spec=plan.spec_traj, deadtime=detector_deadtime)
+    spec_trig_info = ScanSpecInfo(spec=plan.spec_trig, deadtime=detector_deadtime)
 
     # Create panda and detector file writer infos based on spec and det deadtime.
     panda_hdf_info = plan.trig_info(detector_deadtime)

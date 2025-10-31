@@ -113,12 +113,13 @@ set_path_provider(
 # ----------------------------------
 
 
-class common_plan_components:
+class CommonPlanComponents:
     """"""
 
     def __init__(self):
         self.pmac = bl13j.step_25()
-        self.pi = bl13j.sample_xyz()
+        # self.pi = bl13j.sample_xyz()
+        self.pi = bl13j.sample_xyz_lab_fa()
         self.theta = bl13j.theta()
         self.panda02 = bl13j.panda_02()
         self.detector = bl13j.merlin()
@@ -127,11 +128,11 @@ class common_plan_components:
         self.pmac_trajectory_flyer = StandardFlyer(self.pmac_trajectory)
 
         # ToDo: Scan spec currently defined here but will be parametrised.
-        self.scan_frame_duration = 0.004
-        num_fast_axis_pts = 1000
-        fast_axis_start = -5
-        fast_axis_stop = 4.9
-        num_slow_axis_pts = 5
+        self.scan_frame_duration = 0.01  # 0.004 fastest before unable to fill traj buffers in time (1000/8000).  # noqa: E501
+        num_fast_axis_pts = 1000  # 1000, 8000
+        fast_axis_start = -50  #     -50
+        fast_axis_stop = 49  #        49
+        num_slow_axis_pts = 5  #       5, 50
         self.spec = Fly(
             self.scan_frame_duration
             @ (
@@ -170,7 +171,8 @@ class common_plan_components:
 def just_traj_scan():
     """"""
 
-    plan = common_plan_components()
+    print("just_traj_scan")
+    plan = CommonPlanComponents()
     yield from ensure_connected(plan.pmac, plan.pi)
 
     @attach_data_session_metadata_decorator()
@@ -197,7 +199,7 @@ def just_traj_scan():
 def traj_panda_scan():
     """"""
 
-    plan = common_plan_components()
+    plan = CommonPlanComponents()
     yield from ensure_connected(plan.pmac, plan.pi, plan.theta, plan.panda02)
 
     panda_trigger_logic = StandardFlyer(
@@ -257,7 +259,7 @@ def traj_panda_scan():
 def grid_scan():
     """"""
 
-    plan = common_plan_components()
+    plan = CommonPlanComponents()
     yield from ensure_connected(
         plan.pmac, plan.pi, plan.theta, plan.panda02, plan.detector
     )
@@ -274,7 +276,7 @@ def grid_scan():
     )
 
     # detector_deadtime needs to be increased slightly to allow for the internal panda
-    # clock not being precisely synced with the detectors.  Without this the detector
+    # clock not being synced with the detectors clock.  Without this the detector
     # will generally miss every other frame.
     detector_deadtime = plan.detector._controller.get_deadtime(0) * 1.005  # noqa: SLF001
 

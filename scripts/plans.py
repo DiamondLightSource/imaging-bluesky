@@ -122,6 +122,7 @@ class CommonPlanComponents:
         self.pi = bl13j.sample_xyz_map()
         # self.pi = bl13j.sample_xyz_map_fa()
         self.theta = bl13j.theta()
+        self.theta_virtual = bl13j.theta_virtual()
         self.panda02 = bl13j.panda_02()
         self.detector = bl13j.merlin()
 
@@ -143,7 +144,7 @@ class CommonPlanComponents:
                 * ~Line(self.pi.x, fast_axis_start, fast_axis_stop, num_fast_axis_pts)
             )
         )
-        num_fast_axis_pts_trig = num_fast_axis_pts * np.ceil(
+        num_fast_axis_pts_trig = num_fast_axis_pts * np.floor(
             frame_duration_traj / self.frame_duration_trig
         )
         self.spec_trig = Fly(
@@ -216,7 +217,9 @@ def traj_panda_scan():
     """"""
 
     plan = CommonPlanComponents()
-    yield from ensure_connected(plan.pmac, plan.pi, plan.theta, plan.panda02)
+    yield from ensure_connected(
+        plan.pmac, plan.pi, plan.theta, plan.theta_virtual, plan.panda02
+    )
 
     panda_trigger_logic = StandardFlyer(
         ScanSpecSeqTableTriggerLogic(plan.panda02.seq[1])

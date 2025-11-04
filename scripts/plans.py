@@ -129,9 +129,9 @@ class CommonPlanComponents:
         self.pmac_trajectory = PmacTrajectoryTriggerLogic(self.pmac)
         self.pmac_trajectory_flyer = StandardFlyer(self.pmac_trajectory)
 
-        # Seperate scan spec for triggering as trajectory steps can't be <2*2ms.
+        # Seperate scan spec for triggering as trajectory steps can't be <2*2.5ms (2*2ms gives a race condition).  # noqa: E501
         # ToDo: Scan spec currently defined here but will be parametrised.
-        frame_duration_traj = 0.004  # 0.004 fastest before unable to fill traj buffers in time (1000/8000).  # noqa: E501
+        frame_duration_traj = 0.005  # 0.005 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
         self.frame_duration_trig = 0.0001
         num_fast_axis_pts = 1000  # 1000, 8000
         fast_axis_start = -5  #     -50

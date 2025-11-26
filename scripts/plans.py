@@ -33,7 +33,7 @@ from ophyd_async.fastcs.panda import (
 from ophyd_async.plan_stubs import (
     ensure_connected,
 )
-from scanspec.specs import Fly, Line
+from scanspec.specs import Fly, Linspace
 
 BL = bl13j.BL
 PREFIX = bl13j.PREFIX
@@ -140,8 +140,10 @@ class CommonPlanComponents:
         self.spec_traj = Fly(
             frame_duration_traj
             @ (
-                Line(self.pi.y, -20, 20, num_slow_axis_pts)
-                * ~Line(self.pi.x, fast_axis_start, fast_axis_stop, num_fast_axis_pts)
+                Linspace(self.pi.y, -20, 20, num_slow_axis_pts)
+                * ~Linspace(
+                    self.pi.x, fast_axis_start, fast_axis_stop, num_fast_axis_pts
+                )
             )
         )
         num_fast_axis_pts_trig = num_fast_axis_pts * np.floor(
@@ -150,8 +152,8 @@ class CommonPlanComponents:
         self.spec_trig = Fly(
             self.frame_duration_trig
             @ (
-                Line(self.pi.y, -20, 20, num_slow_axis_pts)
-                * ~Line(
+                Linspace(self.pi.y, -20, 20, num_slow_axis_pts)
+                * ~Linspace(
                     self.pi.x,
                     fast_axis_start,
                     fast_axis_stop,
@@ -216,6 +218,7 @@ def just_traj_scan():
 def traj_panda_scan():
     """"""
 
+    print("traj_panda_scan")
     plan = CommonPlanComponents()
     yield from ensure_connected(
         plan.pmac, plan.pi, plan.theta, plan.theta_virtual, plan.panda02
@@ -278,6 +281,7 @@ def traj_panda_scan():
 def grid_scan():
     """"""
 
+    print("grid_scan")
     plan = CommonPlanComponents()
     yield from ensure_connected(
         plan.pmac, plan.pi, plan.theta, plan.panda02, plan.detector

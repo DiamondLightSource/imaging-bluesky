@@ -134,8 +134,8 @@ class CommonPlanComponents:
 
         # Seperate scan spec for triggering as trajectory steps can't be <2*2.5ms (2*2ms gives a race condition).  # noqa: E501
         # ToDo: Scan spec currently defined here but will be parametrised.
-        frame_duration_traj = 0.02  # 0.005 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
-        self.frame_duration_trig = 0.02  # 0.0001
+        frame_duration_traj = 0.015  # 0.005 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
+        self.frame_duration_trig = 0.015  # 0.0001
         num_fast_axis_pts = 200  # 1000, 8000
         fast_axis_start = -25  #    -5, -50
         fast_axis_stop = 25  #      4.9, 49
@@ -327,8 +327,8 @@ def grid_scan():
     # detector_deadtime needs to be increased slightly to allow for the internal panda
     # clock not being synced with the detectors clock.  Without this the detector
     # will generally miss every other frame.
-    # detector_deadtime = plan.detector._controller.get_deadtime(0) * 1.005
-    detector_deadtime = 0.822e-3
+    # detector_deadtime = plan.detector._controller.get_deadtime(0) *
+    detector_deadtime = 0.822e-3 * 1.005
 
     # spec info is defined based on spec and det deadtime.
     spec_trig_info = ScanSpecInfo(spec=plan.spec_trig, deadtime=detector_deadtime)

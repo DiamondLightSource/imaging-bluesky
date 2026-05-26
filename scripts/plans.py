@@ -37,8 +37,8 @@ from scanspec.specs import Fly, Linspace
 
 BL = bl13j.BL
 PREFIX = bl13j.PREFIX
-# PATH = "/dls/i13-1/data/2025/cm40629-5/tmp"
-PATH = "/tmp/local-tests"
+PATH = "/dls/i13-1/data/2026/cm44159-2/tmp"
+# PATH = "/tmp/local-tests"
 
 
 set_path_provider(
@@ -134,8 +134,8 @@ class CommonPlanComponents:
 
         # Seperate scan spec for triggering as trajectory steps can't be <2*2.5ms (2*2ms gives a race condition).  # noqa: E501
         # ToDo: Scan spec currently defined here but will be parametrised.
-        frame_duration_traj = 0.015  # 0.005 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
-        self.frame_duration_trig = 0.015  # 0.0001
+        frame_duration_traj = 0.0125  # 0.005 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
+        self.frame_duration_trig = 0.0125  # 0.0001
         num_fast_axis_pts = 200  # 1000, 8000
         fast_axis_start = -25  #    -5, -50
         fast_axis_stop = 25  #      4.9, 49

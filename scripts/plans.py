@@ -132,20 +132,21 @@ class CommonPlanComponents:
         self.pmac_trajectory = PmacTrajectoryTriggerLogic(self.pmac)
         # self.pmac_trajectory_flyer = StandardFlyer(self.pmac_trajectory)
 
-        # Seperate scan spec for triggering as trajectory steps can't be <2*2.5ms (2*2ms gives a race condition).  # noqa: E501
+        # Seperate scan spec for triggering as trajectory steps can't be <2*3ms.
+        # For v0.17a1 2x2.5ms ok, but not 2x2ms.  In v0.17a4 need 2*3ms to avoid race condition.  # noqa: E501
         # ToDo: Scan spec currently defined here but will be parametrised.
-        frame_duration_traj = 0.0125  # 0.005 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
-        self.frame_duration_trig = 0.0125  # 0.0001
-        num_fast_axis_pts = 200  # 1000, 8000
+        frame_duration_traj = 0.006  # 0.006 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
+        self.frame_duration_trig = 0.000025  # 0.0001
+        num_fast_axis_pts = 250  # 1000, 8000
+        num_slow_axis_pts = 8  #     5, 50
+        num_ang = 2
         fast_axis_start = -25  #    -5, -50
         fast_axis_stop = 25  #      4.9, 49
-        num_slow_axis_pts = 3  #     5, 50
-        num_ang = 2
         self.spec_traj = Fly(
             frame_duration_traj
             @ (
                 # Linspace(self.roll, -0.2, 0, 2)
-                Linspace(self.theta_virtual, -60.01, -60, num_ang)
+                Linspace(self.theta_virtual, -0.01, 0, num_ang)
                 * ~Linspace(self.pi.y, -20, 20, num_slow_axis_pts)
                 * ~Linspace(
                     self.pi.z, fast_axis_start, fast_axis_stop, num_fast_axis_pts
@@ -159,7 +160,7 @@ class CommonPlanComponents:
             self.frame_duration_trig
             @ (
                 # Linspace(self.roll, -0.2, 0, 2)
-                Linspace(self.theta_virtual, -60.01, -60, num_ang)
+                Linspace(self.theta_virtual, -0.01, 0, num_ang)
                 * ~Linspace(self.pi.y, -20, 20, num_slow_axis_pts)
                 * ~Linspace(
                     self.pi.z,
@@ -182,7 +183,7 @@ class CommonPlanComponents:
             f", {fast_axis_stop}), vel={vel}"
             f"\nTotal trajectory time:\t  {tot_frames_traj}*{frame_duration_traj} = "
             f"{tot_frames_traj * frame_duration_traj}s\n"
-            f"Total exposure time:\t  {self.tot_frames_trig}*{self.frame_duration_trig}"
+            f"Total exposure time:\t  {round(self.tot_frames_trig)}*{self.frame_duration_trig}"  # noqa: E501
             f" = {self.tot_frames_trig * self.frame_duration_trig}s\n"
         )
 

@@ -16,19 +16,19 @@ from dodal.plan_stubs.data_session import attach_data_session_metadata_decorator
 # from dodal.utils import BeamlinePrefix, get_beamline_name
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
-    StandardFlyer,
     # StaticPathProvider,
     TriggerInfo,
     # UUIDFilenameProvider,
 )
 from ophyd_async.epics.pmac import (
-    PmacTrajectoryTriggerLogic,
+    PmacScanInfo,
     # PmacIO,
+    PmacTrajectoryFlyableLogic,
 )
 from ophyd_async.fastcs.panda import (
     # HDFPanda,
     ScanSpecInfo,
-    ScanSpecSeqTableTriggerLogic,
+    ScanSpecSeqTableFlyableLogic,
 )
 from ophyd_async.plan_stubs import (
     ensure_connected,
@@ -129,25 +129,27 @@ class CommonPlanComponents:
         self.detector = bl13j.merlin()
         # self.detector = bl13j.eiger()
 
-        self.pmac_trajectory = PmacTrajectoryTriggerLogic(self.pmac)
+        self.pmac_trajectory = PmacTrajectoryFlyableLogic(self.pmac).with_device(
+            "self.pmac"
+        )
         # self.pmac_trajectory_flyer = StandardFlyer(self.pmac_trajectory)
 
         # Seperate scan spec for triggering as trajectory steps can't be <2*3ms.
         # For v0.17a1 2x2.5ms ok, but not 2x2ms.  In v0.17a4 need 2*3ms to avoid race condition.  # noqa: E501
         # ToDo: Scan spec currently defined here but will be parametrised.
-        frame_duration_traj = 0.006  # 0.006 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
-        self.frame_duration_trig = 0.000025  # 0.0001
-        num_fast_axis_pts = 250  # 1000, 8000
+        frame_duration_traj = 0.05  # 0.006 fastest before unable to fill traj buffers in time reliably (1000/8000).  # noqa: E501
+        self.frame_duration_trig = 0.05  # 0.0001
+        num_fast_axis_pts = 100  # 1000, 8000
         num_slow_axis_pts = 8  #     5, 50
-        num_ang = 2
+        num_ang = 1
         fast_axis_start = -25  #    -5, -50
         fast_axis_stop = 25  #      4.9, 49
         self.spec_traj = Fly(
             frame_duration_traj
             @ (
                 # Linspace(self.roll, -0.2, 0, 2)
-                Linspace(self.theta_virtual, -0.01, 0, num_ang)
-                * ~Linspace(self.pi.y, -20, 20, num_slow_axis_pts)
+                # Linspace(self.theta_virtual, -0.01, 0, num_ang)* ~
+                Linspace(self.pi.y, -20, 20, num_slow_axis_pts)
                 * ~Linspace(
                     self.pi.z, fast_axis_start, fast_axis_stop, num_fast_axis_pts
                 )
@@ -160,8 +162,8 @@ class CommonPlanComponents:
             self.frame_duration_trig
             @ (
                 # Linspace(self.roll, -0.2, 0, 2)
-                Linspace(self.theta_virtual, -0.01, 0, num_ang)
-                * ~Linspace(self.pi.y, -20, 20, num_slow_axis_pts)
+                # Linspace(self.theta_virtual, -0.01, 0, num_ang)
+                Linspace(self.pi.y, -20, 20, num_slow_axis_pts)
                 * ~Linspace(
                     self.pi.z,
                     fast_axis_start,
@@ -169,6 +171,10 @@ class CommonPlanComponents:
                     num_fast_axis_pts_trig,
                 )
             )
+        )
+
+        self.trigger_logic = PmacScanInfo(
+            spec=self.spec_traj, ramp_time=None, turnaround_time=None
         )
 
         tot_frames_traj = num_fast_axis_pts * num_slow_axis_pts * num_ang
@@ -226,7 +232,7 @@ def just_traj_scan():
     @bpp.run_decorator()
     def inner_plan():
         # Prepare pmac with the trajectory
-        yield from bps.prepare(plan.pmac_trajectory, plan.spec_traj, wait=True)
+        yield from bps.prepare(plan.pmac_trajectory, plan.trigger_logic, wait=True)
 
         # Start the trajectory.
         yield from bps.kickoff(plan.pmac_trajectory, wait=True)
@@ -245,8 +251,8 @@ def traj_panda_scan():
         plan.pmac, plan.pi, plan.theta, plan.theta_virtual, plan.roll, plan.panda02
     )
 
-    panda_trigger_logic = StandardFlyer(
-        ScanSpecSeqTableTriggerLogic(plan.panda02.seq[1])
+    panda_trigger_logic = ScanSpecSeqTableFlyableLogic(plan.panda02.seq[1]).with_device(
+        "plan.panda02"
     )
 
     panda_deadtime = 8e-9
@@ -270,7 +276,9 @@ def traj_panda_scan():
     @bpp.run_decorator()
     def inner_plan():
         # Prepare pmac with the trajectory
-        yield from bps.prepare(plan.pmac_trajectory, plan.spec_traj, group="sync_prep")
+        yield from bps.prepare(
+            plan.pmac_trajectory, plan.trigger_logic, group="sync_prep"
+        )
         # prepare sequencer table
         yield from bps.prepare(panda_trigger_logic, spec_trig_info, group="sync_prep")
         # prepare panda and hdf writer
@@ -316,14 +324,12 @@ def grid_scan():
 
     # Use PosOutScaleOffset if want to compare position after start of row (GPIO) signal
     # from pmac trajectory motion program.
-    panda_trigger_logic = StandardFlyer(
-        ScanSpecSeqTableTriggerLogic(
-            plan.panda02.seq[1],
-            {
-                # motor_t: PosOutScaleOffset.from_inenc(panda=panda02, number=4)
-            },
-        )
-    )
+    panda_trigger_logic = ScanSpecSeqTableFlyableLogic(
+        plan.panda02.seq[1],
+        {
+            # motor_t: PosOutScaleOffset.from_inenc(panda=panda02, number=4)
+        },
+    ).with_device("plan.panda02")
 
     # detector_deadtime needs to be increased slightly to allow for the internal panda
     # clock not being synced with the detectors clock.  Without this the detector

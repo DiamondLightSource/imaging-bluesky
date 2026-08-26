@@ -21,7 +21,7 @@ dependencies = [
     "matplotlib",
     "databroker",
     "scipy",
-    "dls-dodal",
+    "dls-dodal>=2.6.2",
     "typer",
     'ipython',
     'scanspec @ git+https://github.com/bluesky/scanspec.git',

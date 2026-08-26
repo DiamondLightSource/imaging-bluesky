@@ -48,7 +48,8 @@
 #     panda_pcomp = StandardFlyer(StaticPcompTriggerLogic(panda.pcomp[1]))
 
 #     # MRES changes depending on the motor.
-#     # Getting this value from the motor will be soon available through an async function
+#     # Getting this value from the motor will be
+#     #soon available through an async function
 #     if motor.name == "alignment_stages-x":
 #         MRES = MRES_X
 #     elif motor.name == "alignment_stages-theta":

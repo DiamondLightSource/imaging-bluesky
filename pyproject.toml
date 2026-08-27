@@ -24,7 +24,7 @@ dependencies = [
     "dls-dodal>=2.6.2",
     "typer",
     'ipython',
-    'scanspec @ git+https://github.com/bluesky/scanspec.git',
+    'scanspec',
 ]
 dynamic = ["version"]
 license.file = "LICENSE"

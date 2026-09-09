@@ -10,5 +10,5 @@ from dodal.common import inject
 from ophyd_async.epics.motor import Motor
 
 
-def move_motor(pos: float, motor: Motor = inject("sim_motor_x")) -> MsgGenerator[None]:
+def move_motor(pos: float, motor: Motor = inject("sim_motor_x")) -> MsgGenerator[None]:  # noqa: B008
     yield from bps.mv(motor, pos)

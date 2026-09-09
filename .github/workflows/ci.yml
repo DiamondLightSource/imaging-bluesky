@@ -5,11 +5,10 @@ on:
     branches:
       - main
     tags:
-      - '*'
+      - "*"
   pull_request:
 
 jobs:
-
   lint:
     uses: ./.github/workflows/_tox.yml
     with:
@@ -44,14 +43,27 @@ jobs:
 
   dist:
     uses: ./.github/workflows/_dist.yml
-  
+
   pypi:
     needs: [dist, test]
     if: github.ref_type == 'tag'
-    uses: ./.github/workflows/_pypi.yml
+    runs-on: ubuntu-latest
+    environment: release
     permissions:
       id-token: write
-  
+
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to PyPI using trusted publishing
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: false
+
   release:
     needs: [dist, test]
     if: github.ref_type == 'tag'

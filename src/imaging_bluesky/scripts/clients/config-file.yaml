@@ -1,0 +1,18 @@
+api:
+  url: http://0.0.0.0:8000
+env:
+  metadata:
+    instrument: b16
+  sources:
+    - kind: deviceManager
+      module: dodal.beamlines.b16
+      mock: True
+    - kind: planFunctions
+      module: dodal.plans
+    - kind: planFunctions
+      module: dodal.plan_stubs.wrapped
+    - kind: planFunctions
+      module: imaging_bluesky.b16.plans
+stomp:
+  enabled: true
+  url: tcp://localhost:61613/

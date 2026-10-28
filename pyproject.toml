@@ -15,16 +15,17 @@ description = "Bluesky plans and tools for the Imaging Group"
 dependencies = [
     "bluesky",
     "ophyd",
-    "ophyd_async==0.21.1",
+    "ophyd_async",
     "pandas",
     "ipython",
     "matplotlib",
     "databroker",
     "scipy",
-    "dls-dodal",
+    "dls-dodal@git+https://github.com/DiamondLightSource/dodal.git@main",
     "typer",
     'ipython',
     'scanspec @ git+https://github.com/bluesky/scanspec.git',
+    'blueapi'
 ]
 dynamic = ["version"]
 license.file = "LICENSE"

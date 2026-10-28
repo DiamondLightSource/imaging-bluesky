@@ -10,24 +10,24 @@ import numpy as np
 from bluesky.preprocessors import stage_decorator
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
+from dodal.devices.motors import XYZStage
 from ophyd_async.epics.adcore import AreaDetector
 from ophyd_async.epics.motor import Motor
 
 
 # it would be cool to see if you can find the plan stubs that make up a simple plan like the scan
-@stage_decorator
 def simple_scan(
     start_pos: float,
     stop_pos: float,
-    num_points: float,
-    motor: Motor = inject("sim_motor_x"),  # noqa: B008
+    num_points: int,
+    motor: XYZStage = inject("sim_stage"),  # noqa: B008
     det: AreaDetector = inject("fds2"),  # noqa: B008
 ) -> MsgGenerator[None]:
     # det_signal = yield from bps.rd(det) # I think that this is the correct way to get the signal from the detector, but I am not sure.
-    yield from bp.scan([det], motor, start_pos, stop_pos, num_points)
+    yield from bp.scan([det], motor.x, start_pos, stop_pos, num_points)
+    #yield from bp.scan([], motor.x, start_pos, stop_pos, num_points)
 
 
-# @stage_decorator  # Ask - is it correct to have this everywhere
 def knife_scan(
     start_pos: float,
     stop_pos: float,

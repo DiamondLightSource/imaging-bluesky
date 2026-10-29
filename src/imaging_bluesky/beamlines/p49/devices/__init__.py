@@ -1,9 +1,8 @@
 from dodal.common.beamlines.beamline_utils import device_factory, get_path_provider
 from dodal.utils import BeamlinePrefix, get_beamline_name
+from imaging_bluesky.p49.devices.stages import Stages
 from ophyd_async.epics.adaravis import AravisDetector
 from ophyd_async.fastcs.panda import HDFPanda
-
-from imaging_bluesky.p49.devices.stages import Stages
 
 BL = get_beamline_name("p49")
 PREFIX = BeamlinePrefix(BL)

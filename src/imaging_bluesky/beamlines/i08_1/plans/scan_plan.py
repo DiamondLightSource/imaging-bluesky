@@ -17,7 +17,7 @@ from ophyd_async.fastcs.panda import (
 from ophyd_async.plan_stubs import (
     ensure_connected,
 )
-from scanspec.specs import Fly, Line
+from scanspec.specs import Fly, Line, step
 
 BL = bl08j.BL
 PREFIX = bl08j.PREFIX
@@ -25,7 +25,9 @@ PREFIX = bl08j.PREFIX
 
 def panda_scan(
     start: float,
+    start_slow: float,
     stop: float,
+    stop_slow: float,
     num: int,
     duration: float,
     repetitions: int = 1,
@@ -36,18 +38,26 @@ def panda_scan(
     p = bl08j.panda1(bl08j.path_provider())
     # motor_x = Motor(prefix="BL08J-EA-TABLE-01:XF", name="Motor_X")
     motor_x = bl08j.scanning_fine_x()
+    motor_y = bl08j.scanning_fine_y()
     # pmac = bl08j.scanning_pmac()
     pmac = PmacIO(
         prefix=f"{PREFIX.beamline_prefix}-MO-STEP-01:",
-        raw_motors=[motor_x],
+        raw_motors=[motor_x, motor_y],
         coord_nums=[2],
         name="pmac",
     )
-    yield from ensure_connected(pmac, motor_x, p)
+    yield from ensure_connected(pmac, motor_x, motor_y, p)
     panda_seq = ScanSpecSeqTableFlyableLogic(p.seq[1]).with_device()
 
     # Prepare motor info using trajectory scanning
-    spec = Fly(float(duration) @ (repetitions * ~Line(motor_x, start, stop, num)))
+    spec = Fly(
+        float(duration)
+        @ (Line(motor_y, start_slow, stop_slow, num) * ~Line(motor_x, start, stop, num))
+    )
+    spec = step(
+        (Line(motor_y, start_slow, stop_slow, num) * ~Line(motor_x, start, stop, num)),
+        float(duration),
+    )
 
     info = PmacScanInfo(spec=spec, ramp_time=ramp_time, turnaround_time=turnaround_time)
 

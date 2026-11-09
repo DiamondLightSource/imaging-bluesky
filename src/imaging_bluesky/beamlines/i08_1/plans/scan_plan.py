@@ -55,7 +55,7 @@ def panda_scan(
         @ (Line(motor_y, start_slow, stop_slow, num) * ~Line(motor_x, start, stop, num))
     )
     spec = step(
-        (Line(motor_y, start_slow, stop_slow, num) * ~Line(motor_x, start, stop, num)),
+        (Line(motor_y, start_slow, stop_slow, num) * Line(motor_x, start, stop, num)),
         float(duration),
     )
 

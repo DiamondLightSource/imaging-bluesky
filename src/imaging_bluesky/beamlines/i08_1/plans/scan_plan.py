@@ -1,6 +1,7 @@
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
 import dodal.beamlines.i08_1 as bl08j
+from bluesky.utils import MsgGenerator
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
     TriggerInfo,
@@ -33,7 +34,7 @@ def panda_scan(
     repetitions: int = 1,
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
-):
+) -> MsgGenerator[None]:
     # p = bl08j.panda1(get_path_provider())
     p = bl08j.panda1(bl08j.path_provider())
     # motor_x = Motor(prefix="BL08J-EA-TABLE-01:XF", name="Motor_X")

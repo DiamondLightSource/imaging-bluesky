@@ -38,12 +38,12 @@ def panda_scan(
     # p = bl08j.panda1(get_path_provider())
     p = bl08j.panda1(bl08j.path_provider())
     # motor_x = Motor(prefix="BL08J-EA-TABLE-01:XF", name="Motor_X")
-    motor_x = bl08j.combined_x()
-    motor_y = bl08j.combined_y()
+    motor_x = bl08j.scanning_combined().x
+    motor_y = bl08j.scanning_combined().y
     # pmac = bl08j.scanning_pmac()
     pmac = PmacIO(
         prefix=f"{PREFIX.beamline_prefix}-MO-STEP-01:",
-        raw_motors=[bl08j.scanning_fine_x(), bl08j.scanning_fine_y()],
+        raw_motors=[bl08j.scanning_fine().x, bl08j.scanning_fine().y],
         coord_nums=[2],
         name="pmac",
     )

@@ -100,21 +100,21 @@ def panda_scan(
     @bpp.run_decorator()
     @bpp.stage_decorator([p, panda_seq, pmac, detector])
     def inner_plan():
+        # prepare detector and hdf writer
+        yield from bps.prepare(detector, detector_info, wait=True)
         # Prepare pmac with the trajectory
         yield from bps.prepare(pmac_trajectory_flyer, info, wait=True)
         # prepare sequencer table
         yield from bps.prepare(panda_seq, ss_info, wait=True)
         # prepare panda and hdf writer once, at start of scan
         yield from bps.prepare(p, panda_hdf_info, wait=True)
-        # prepare detector and hdf writer
-        yield from bps.prepare(detector, detector_info, wait=True)
 
         yield from bps.declare_stream(detector, name="primary", collect=True)
 
         # kickoff devices waiting for all of them
-        yield from bps.kickoff(p)
-        yield from bps.kickoff(panda_seq)
         yield from bps.kickoff(detector, wait=True)
+        yield from bps.kickoff(p, wait=True)
+        yield from bps.kickoff(panda_seq, wait=True)
 
         # Start the Trajectory
         yield from bps.kickoff(pmac_trajectory_flyer, wait=True)

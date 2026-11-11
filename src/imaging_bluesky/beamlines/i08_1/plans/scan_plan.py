@@ -2,10 +2,13 @@ import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
 import dodal.beamlines.i08_1 as bl08j
 from bluesky.utils import MsgGenerator
+from dodal.common.beamlines.device_helpers import CAM_SUFFIX, HDF5_SUFFIX
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
     TriggerInfo,
 )
+from ophyd_async.epics.adandor3 import Andor3Detector
+from ophyd_async.epics.adcore import ADWriterFactory
 from ophyd_async.epics.pmac import (
     PmacIO,
     PmacScanInfo,
@@ -35,9 +38,7 @@ def panda_scan(
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
 ) -> MsgGenerator[None]:
-    # p = bl08j.panda1(get_path_provider())
     p = bl08j.panda1(bl08j.path_provider())
-    # motor_x = Motor(prefix="BL08J-EA-TABLE-01:XF", name="Motor_X")
     motor_x = bl08j.scanning_combined().x
     motor_y = bl08j.scanning_combined().y
     # pmac = bl08j.scanning_pmac()
@@ -47,7 +48,18 @@ def panda_scan(
         coord_nums=[2],
         name="pmac",
     )
-    yield from ensure_connected(pmac, motor_x, motor_y, p)
+
+    detector = Andor3Detector(
+        f"{PREFIX.beamline_prefix}-EA-DET-08:",
+        ADWriterFactory.hdf(
+            path_provider=bl08j.path_provider(), writer_suffix=HDF5_SUFFIX
+        ),
+        driver_suffix=CAM_SUFFIX,
+        name="AndorMarana",
+    )
+
+    # detector = Andor3DriverIO(prefix="BL08J-EA-DET-08:CAM:")
+    yield from ensure_connected(pmac, motor_x, motor_y, p, detector)
     panda_seq = ScanSpecSeqTableFlyableLogic(p.seq[1]).with_device()
 
     # Prepare motor info using trajectory scanning
@@ -78,8 +90,15 @@ def panda_scan(
         deadtime=1e-5,
     )
 
+    detector_info = TriggerInfo(
+        number_of_events=num * num,
+        trigger=DetectorTrigger.EXTERNAL_EDGE,
+        livetime=duration - 0.05,
+        deadtime=0.05,
+    )
+
     @bpp.run_decorator()
-    @bpp.stage_decorator([p, panda_seq])
+    @bpp.stage_decorator([p, panda_seq, pmac, detector])
     def inner_plan():
         # Prepare pmac with the trajectory
         yield from bps.prepare(pmac_trajectory_flyer, info, wait=True)
@@ -87,12 +106,30 @@ def panda_scan(
         yield from bps.prepare(panda_seq, ss_info, wait=True)
         # prepare panda and hdf writer once, at start of scan
         yield from bps.prepare(p, panda_hdf_info, wait=True)
+        # prepare detector and hdf writer
+        yield from bps.prepare(detector, detector_info, wait=True)
+
+        yield from bps.declare_stream(detector, name="primary", collect=True)
 
         # kickoff devices waiting for all of them
-        yield from bps.kickoff(p, wait=True)
-        yield from bps.kickoff(panda_seq, wait=True)
+        yield from bps.kickoff(p)
+        yield from bps.kickoff(panda_seq)
+        yield from bps.kickoff(detector, wait=True)
+
+        # Start the Trajectory
         yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
 
-        yield from bps.complete_all(pmac_trajectory_flyer, p, panda_seq, wait=True)
+        # Wait for the scan to complete whilst continuously collecting the data.
+        yield from bps.collect_while_completing(
+            flyers=[
+                pmac_trajectory_flyer,
+                p,
+                panda_seq,
+                detector,
+            ],
+            dets=[detector],
+            flush_period=0.5,
+            stream_name="primary",
+        )
 
     yield from inner_plan()

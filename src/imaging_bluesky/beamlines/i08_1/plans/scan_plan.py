@@ -81,6 +81,14 @@ def panda_scan(
     print(f"acq_duration = {acq_duration}")
 
     ss_info = ScanSpecInfo(spec=spec, deadtime=0.1)
+    _md = {
+        "plan_args": {
+            "detectors": {det.name for det in [p, detector]},
+            "spec": repr(spec),
+        },
+        "plan_name": "mapping_scan",
+        "shape": spec.shape(),
+    }
 
     # Prepare Panda file writer trigger info
     panda_hdf_info = TriggerInfo(
@@ -97,7 +105,7 @@ def panda_scan(
         deadtime=0.05,
     )
 
-    @bpp.run_decorator()
+    @bpp.run_decorator(md=_md)
     @bpp.stage_decorator([p, panda_seq, pmac, detector])
     def inner_plan():
         # prepare detector and hdf writer

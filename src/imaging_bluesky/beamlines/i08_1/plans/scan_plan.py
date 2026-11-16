@@ -38,7 +38,7 @@ def panda_scan(
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
 ) -> MsgGenerator[None]:
-    p = bl08j.panda1(bl08j.path_provider())
+    p = bl08j.panda1(bl08j.panda_path_provider())
     motor_x = bl08j.scanning_combined().x
     motor_y = bl08j.scanning_combined().y
     # pmac = bl08j.scanning_pmac()
@@ -52,7 +52,7 @@ def panda_scan(
     detector = Andor3Detector(
         f"{PREFIX.beamline_prefix}-EA-DET-08:",
         ADWriterFactory.hdf(
-            path_provider=bl08j.path_provider(), writer_suffix=HDF5_SUFFIX
+            path_provider=bl08j.detector_path_provider(), writer_suffix=HDF5_SUFFIX
         ),
         driver_suffix=CAM_SUFFIX,
         name="AndorMarana",

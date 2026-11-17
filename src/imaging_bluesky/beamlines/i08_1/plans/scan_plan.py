@@ -117,7 +117,8 @@ def panda_scan(
         # prepare panda and hdf writer once, at start of scan
         yield from bps.prepare(p, panda_hdf_info, wait=True)
 
-        yield from bps.declare_stream(detector, name="primary", collect=True)
+        # Note: PandA datasets PVs need to be set on inenc vals
+        yield from bps.declare_stream(detector, p, name="primary", collect=True)
 
         # kickoff devices waiting for all of them
         yield from bps.kickoff(detector, wait=True)
@@ -135,7 +136,7 @@ def panda_scan(
                 panda_seq,
                 detector,
             ],
-            dets=[detector],
+            dets=[detector, p],
             flush_period=0.5,
             stream_name="primary",
         )

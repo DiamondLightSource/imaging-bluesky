@@ -92,7 +92,7 @@ def panda_scan(
             "spec": repr(spec),
         },
         "plan_name": "mapping_scan",
-        "shape": spec.midpoints(),
+        "shape": repr(spec.midpoints()),
     }
 
     # Prepare Panda file writer trigger info

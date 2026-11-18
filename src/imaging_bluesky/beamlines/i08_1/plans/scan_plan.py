@@ -93,7 +93,6 @@ def panda_scan(
         },
         "plan_name": "mapping_scan",
         "shape": spec.midpoints(),
-        "baseline_devices": motor_x,
     }
 
     # Prepare Panda file writer trigger info

@@ -1,3 +1,5 @@
+from typing import Any
+
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
 import dodal.beamlines.i08_1 as bl08j
@@ -5,6 +7,8 @@ from bluesky.utils import MsgGenerator
 from dodal.common.beamlines.device_helpers import CAM_SUFFIX, HDF5_SUFFIX
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
+    SignalR,
+    StandardReadable,
     TriggerInfo,
 )
 from ophyd_async.epics.adandor3 import Andor3Detector
@@ -37,6 +41,7 @@ def panda_scan(
     repetitions: int = 1,
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
+    # baseline_devices: list[StandardReadable | SignalR[Any]] | None = None,
 ) -> MsgGenerator[None]:
     p = bl08j.panda1(bl08j.panda_path_provider())
     motor_x = bl08j.scanning_combined().x
@@ -90,6 +95,8 @@ def panda_scan(
         "shape": spec.shape(),
     }
 
+    baseline_devices = [motor_x, motor_y]
+
     # Prepare Panda file writer trigger info
     panda_hdf_info = TriggerInfo(
         number_of_events=0,
@@ -107,6 +114,7 @@ def panda_scan(
 
     @bpp.run_decorator(md=_md)
     @bpp.stage_decorator([p, panda_seq, pmac, detector])
+    @bpp.baseline_decorator(baseline_devices)
     def inner_plan():
         # prepare detector and hdf writer
         yield from bps.prepare(detector, detector_info, wait=True)

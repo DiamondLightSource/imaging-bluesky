@@ -92,10 +92,9 @@ def panda_scan(
             "spec": repr(spec),
         },
         "plan_name": "mapping_scan",
-        "shape": spec.shape(),
+        "shape": spec.midpoints(),
+        "baseline_devices": motor_x,
     }
-
-    baseline_devices = [motor_x, motor_y]
 
     # Prepare Panda file writer trigger info
     panda_hdf_info = TriggerInfo(
@@ -114,7 +113,6 @@ def panda_scan(
 
     @bpp.run_decorator(md=_md)
     @bpp.stage_decorator([p, panda_seq, pmac, detector])
-    @bpp.baseline_decorator(baseline_devices)
     def inner_plan():
         # prepare detector and hdf writer
         yield from bps.prepare(detector, detector_info, wait=True)

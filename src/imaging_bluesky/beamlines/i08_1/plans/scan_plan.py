@@ -1,6 +1,8 @@
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
 import dodal.beamlines.i08_1 as bl08j
+from dodal.common import inject
+from dodal.devices.i08_1.scanning_combined import XYStage
 from bluesky.utils import MsgGenerator
 from dodal.common.beamlines.device_helpers import CAM_SUFFIX, HDF5_SUFFIX
 from ophyd_async.core import (  # noqa: F401
@@ -26,6 +28,9 @@ from scanspec.specs import Fly, Line, step
 BL = bl08j.BL
 PREFIX = bl08j.PREFIX
 
+scanning_combined = inject("scanning_combined")
+
+
 
 def panda_scan(
     start: float,
@@ -37,10 +42,11 @@ def panda_scan(
     repetitions: int = 1,
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
+    scanning_combined: XYStage = scanning_combined
 ) -> MsgGenerator[None]:
     p = bl08j.panda1(bl08j.panda_path_provider())
-    motor_x = bl08j.scanning_combined().x
-    motor_y = bl08j.scanning_combined().y
+    motor_x = scanning_combined().x
+    motor_y = scanning_combined().y
     # pmac = bl08j.scanning_pmac()
     pmac = PmacIO(
         prefix=f"{PREFIX.beamline_prefix}-MO-STEP-01:",

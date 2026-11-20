@@ -29,6 +29,8 @@ BL = bl08j.BL
 PREFIX = bl08j.PREFIX
 
 scanning_combined = inject("scanning_combined")
+pmac = inject("scanning_pmac")
+
 
 
 
@@ -42,18 +44,12 @@ def panda_scan(
     repetitions: int = 1,
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
-    scanning_combined: XYStage = scanning_combined
+    scanning_combined: XYStage = scanning_combined,
+    pmac: PmacIO = pmac,
 ) -> MsgGenerator[None]:
     p = bl08j.panda1(bl08j.panda_path_provider())
     motor_x = scanning_combined().x
     motor_y = scanning_combined().y
-    # pmac = bl08j.scanning_pmac()
-    pmac = PmacIO(
-        prefix=f"{PREFIX.beamline_prefix}-MO-STEP-01:",
-        raw_motors=[bl08j.scanning_fine().x, bl08j.scanning_fine().y],
-        coord_nums=[2],
-        name="pmac",
-    )
 
     detector = Andor3Detector(
         f"{PREFIX.beamline_prefix}-EA-DET-08:",

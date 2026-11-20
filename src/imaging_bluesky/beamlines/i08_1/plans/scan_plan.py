@@ -50,7 +50,7 @@ def panda_scan(
     scanning_combined: XYStage = scanning_combined,
     pmac: PmacIO = pmac,
     detector: Andor3Detector = detector,
-    panda1: HDFPanda = panda,
+    panda: HDFPanda = panda,
 
 ) -> MsgGenerator[None]:
 

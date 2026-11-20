@@ -2,11 +2,10 @@ import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
 import dodal.beamlines.i08_1 as bl08j
 from dodal.common import inject
-from dodal.devices.i08_1.scanning_combined import XYStage
-from dodal.devices.i08_1.andor_detector import Andor3Detector
-from dodal.devices.i08_1.scanning_pmac import PmacIO
-from dodal.devices.i08_1.panda1 import HDFPanda
-from dodal.devices.i08_1.panda_path_provider import PathProvider
+from dodal.devices.motors import XYStage
+from ophyd_async.epics.adandor3 import Andor3Detector
+from ophyd_async.fastcs.panda import HDFPanda
+from ophyd_async.core import PathProvider
 
 from bluesky.utils import MsgGenerator
 from dodal.common.beamlines.device_helpers import CAM_SUFFIX, HDF5_SUFFIX
@@ -17,6 +16,7 @@ from ophyd_async.core import (  # noqa: F401
 #from ophyd_async.epics.adandor3 import Andor3Detector
 from ophyd_async.epics.adcore import ADWriterFactory
 from ophyd_async.epics.pmac import (
+    PmacIO,
     PmacScanInfo,
     PmacTrajectoryFlyableLogic,
 )
@@ -29,14 +29,10 @@ from ophyd_async.plan_stubs import (
 )
 from scanspec.specs import Fly, Line, step
 
-BL = bl08j.BL
-PREFIX = bl08j.PREFIX
-
 scanning_combined = inject("scanning_combined")
 pmac = inject("scanning_pmac")
 detector = inject("andor_detector")
-panda1 = inject("panda1")
-panda_path_provider = inject("panda_path_provider")
+panda = inject("panda1")
 
 
 
@@ -54,23 +50,19 @@ def panda_scan(
     scanning_combined: XYStage = scanning_combined,
     pmac: PmacIO = pmac,
     detector: Andor3Detector = detector,
-    panda1: HDFPanda = panda1,
-    panda_path_provider: PathProvider = panda_path_provider
-) -> MsgGenerator[None]:
-    panda = panda1(panda_path_provider())
-    motor_x = scanning_combined().x
-    motor_y = scanning_combined().y
+    panda1: HDFPanda = panda,
 
-    yield from ensure_connected(pmac, motor_x, motor_y, panda, detector)
+) -> MsgGenerator[None]:
+
     panda_seq = ScanSpecSeqTableFlyableLogic(panda.seq[1]).with_device()
 
     # Prepare motor info using trajectory scanning
     spec = Fly(
         float(duration)
-        @ (Line(motor_y, start_slow, stop_slow, num) * ~Line(motor_x, start, stop, num))
+        @ (Line(scanning_combined.y, start_slow, stop_slow, num) * ~Line(scanning_combined.x, start, stop, num))
     )
     spec = step(
-        (Line(motor_y, start_slow, stop_slow, num) * Line(motor_x, start, stop, num)),
+        (Line(scanning_combined.y, start_slow, stop_slow, num) * Line(scanning_combined.x, start, stop, num)),
         float(duration),
     )
 
@@ -108,6 +100,7 @@ def panda_scan(
     )
 
     @bpp.run_decorator(md=_md)
+    @bpp.baseline_decorator([scanning_combined])
     @bpp.stage_decorator([panda, panda_seq, pmac, detector])
     def inner_plan():
         # prepare detector and hdf writer

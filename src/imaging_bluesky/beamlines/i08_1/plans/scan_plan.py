@@ -1,31 +1,24 @@
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
-import dodal.beamlines.i08_1 as bl08j
+from bluesky.utils import MsgGenerator
 from dodal.common import inject
 from dodal.devices.motors import XYStage
-from ophyd_async.epics.adandor3 import Andor3Detector
-from ophyd_async.fastcs.panda import HDFPanda
-from ophyd_async.core import PathProvider
-
-from bluesky.utils import MsgGenerator
-from dodal.common.beamlines.device_helpers import CAM_SUFFIX, HDF5_SUFFIX
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
     TriggerInfo,
 )
-#from ophyd_async.epics.adandor3 import Andor3Detector
-from ophyd_async.epics.adcore import ADWriterFactory
+from ophyd_async.epics.adandor3 import Andor3Detector
+
+# from ophyd_async.epics.adandor3 import Andor3Detector
 from ophyd_async.epics.pmac import (
     PmacIO,
     PmacScanInfo,
     PmacTrajectoryFlyableLogic,
 )
 from ophyd_async.fastcs.panda import (
+    HDFPanda,
     ScanSpecInfo,
     ScanSpecSeqTableFlyableLogic,
-)
-from ophyd_async.plan_stubs import (
-    ensure_connected,
 )
 from scanspec.specs import Fly, Line, step
 
@@ -33,8 +26,6 @@ scanning_combined = inject("scanning_combined")
 pmac = inject("scanning_pmac")
 detector = inject("andor_detector")
 panda = inject("panda1")
-
-
 
 
 def panda_scan(
@@ -51,7 +42,6 @@ def panda_scan(
     pmac: PmacIO = pmac,
     detector: Andor3Detector = detector,
     panda: HDFPanda = panda,
-
 ) -> MsgGenerator[None]:
 
     panda_seq = ScanSpecSeqTableFlyableLogic(panda.seq[1]).with_device()
@@ -59,10 +49,16 @@ def panda_scan(
     # Prepare motor info using trajectory scanning
     spec = Fly(
         float(duration)
-        @ (Line(scanning_combined.y, start_slow, stop_slow, num) * ~Line(scanning_combined.x, start, stop, num))
+        @ (
+            Line(scanning_combined.y, start_slow, stop_slow, num)
+            * ~Line(scanning_combined.x, start, stop, num)
+        )
     )
     spec = step(
-        (Line(scanning_combined.y, start_slow, stop_slow, num) * Line(scanning_combined.x, start, stop, num)),
+        (
+            Line(scanning_combined.y, start_slow, stop_slow, num)
+            * Line(scanning_combined.x, start, stop, num)
+        ),
         float(duration),
     )
 

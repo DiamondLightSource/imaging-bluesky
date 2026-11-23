@@ -8,8 +8,6 @@ from ophyd_async.core import (  # noqa: F401
     TriggerInfo,
 )
 from ophyd_async.epics.adandor3 import Andor3Detector
-
-# from ophyd_async.epics.adandor3 import Andor3Detector
 from ophyd_async.epics.pmac import (
     PmacIO,
     PmacScanInfo,
@@ -33,8 +31,9 @@ def panda_scan(
     start_slow: float,
     stop: float,
     stop_slow: float,
-    num: int,
-    duration: float,
+    num_fast: int,
+    num_slow: int,
+    exposure: float,
     repetitions: int = 1,
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
@@ -45,19 +44,21 @@ def panda_scan(
 ) -> MsgGenerator[None]:
 
     panda_seq = ScanSpecSeqTableFlyableLogic(panda.seq[1]).with_device()
+    deadtime = 0.04202
 
     # Prepare motor info using trajectory scanning
+    duration = exposure + deadtime
     spec = Fly(
         float(duration)
         @ (
-            Line(scanning_combined.y, start_slow, stop_slow, num)
-            * ~Line(scanning_combined.x, start, stop, num)
+            Line(scanning_combined.y, start_slow, stop_slow, num_slow)
+            * ~Line(scanning_combined.x, start, stop, num_fast)
         )
     )
     spec = step(
         (
-            Line(scanning_combined.y, start_slow, stop_slow, num)
-            * Line(scanning_combined.x, start, stop, num)
+            Line(scanning_combined.y, start_slow, stop_slow, num_slow)
+            * Line(scanning_combined.x, start, stop, num_fast)
         ),
         float(duration),
     )
@@ -67,14 +68,11 @@ def panda_scan(
     pmac_trajectory = PmacTrajectoryFlyableLogic(pmac)
     pmac_trajectory_flyer = pmac_trajectory.with_device()
 
-    acq_duration = (num * duration) / (num + 1)
-    print(f"acq_duration = {acq_duration}")
-
     ss_info = ScanSpecInfo(spec=spec, deadtime=0.1)
     _md = {
         "plan_args": {
             "detectors": {det.name for det in [panda, detector]},
-            "spec": repr(spec),
+            "spec": spec.serialize(),
         },
         "plan_name": "mapping_scan",
         "shape": spec.shape(),
@@ -89,10 +87,10 @@ def panda_scan(
     )
 
     detector_info = TriggerInfo(
-        number_of_events=num * num,
+        number_of_events=num_fast * num_slow,
         trigger=DetectorTrigger.EXTERNAL_EDGE,
-        livetime=duration - 0.05,
-        deadtime=0.05,
+        livetime=exposure,
+        deadtime=deadtime,
     )
 
     @bpp.run_decorator(md=_md)

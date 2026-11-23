@@ -1,35 +1,31 @@
 import bluesky.plan_stubs as bps
 import bluesky.preprocessors as bpp
-import dodal.beamlines.i08_1 as bl08j
-from dodal.common import inject
-from dodal.devices.i08_1.scanning_combined import XYStage
 from bluesky.utils import MsgGenerator
-from dodal.common.beamlines.device_helpers import CAM_SUFFIX, HDF5_SUFFIX
+from dodal.common import inject
+from dodal.devices.motors import XYStage
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
     TriggerInfo,
 )
 from ophyd_async.epics.adandor3 import Andor3Detector
-from ophyd_async.epics.adcore import ADWriterFactory
+
+# from ophyd_async.epics.adandor3 import Andor3Detector
 from ophyd_async.epics.pmac import (
     PmacIO,
     PmacScanInfo,
     PmacTrajectoryFlyableLogic,
 )
 from ophyd_async.fastcs.panda import (
+    HDFPanda,
     ScanSpecInfo,
     ScanSpecSeqTableFlyableLogic,
 )
-from ophyd_async.plan_stubs import (
-    ensure_connected,
-)
 from scanspec.specs import Fly, Line, step
 
-BL = bl08j.BL
-PREFIX = bl08j.PREFIX
-
 scanning_combined = inject("scanning_combined")
-
+pmac = inject("scanning_pmac")
+detector = inject("andor_detector")
+panda = inject("panda1")
 
 
 def panda_scan(
@@ -42,39 +38,27 @@ def panda_scan(
     repetitions: int = 1,
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
-    scanning_combined: XYStage = scanning_combined
+    scanning_combined: XYStage = scanning_combined,
+    pmac: PmacIO = pmac,
+    detector: Andor3Detector = detector,
+    panda: HDFPanda = panda,
 ) -> MsgGenerator[None]:
-    p = bl08j.panda1(bl08j.panda_path_provider())
-    motor_x = scanning_combined().x
-    motor_y = scanning_combined().y
-    # pmac = bl08j.scanning_pmac()
-    pmac = PmacIO(
-        prefix=f"{PREFIX.beamline_prefix}-MO-STEP-01:",
-        raw_motors=[bl08j.scanning_fine().x, bl08j.scanning_fine().y],
-        coord_nums=[2],
-        name="pmac",
-    )
 
-    detector = Andor3Detector(
-        f"{PREFIX.beamline_prefix}-EA-DET-08:",
-        ADWriterFactory.hdf(
-            path_provider=bl08j.detector_path_provider(), writer_suffix=HDF5_SUFFIX
-        ),
-        driver_suffix=CAM_SUFFIX,
-        name="AndorMarana",
-    )
-
-    # detector = Andor3DriverIO(prefix="BL08J-EA-DET-08:CAM:")
-    yield from ensure_connected(pmac, motor_x, motor_y, p, detector)
-    panda_seq = ScanSpecSeqTableFlyableLogic(p.seq[1]).with_device()
+    panda_seq = ScanSpecSeqTableFlyableLogic(panda.seq[1]).with_device()
 
     # Prepare motor info using trajectory scanning
     spec = Fly(
         float(duration)
-        @ (Line(motor_y, start_slow, stop_slow, num) * ~Line(motor_x, start, stop, num))
+        @ (
+            Line(scanning_combined.y, start_slow, stop_slow, num)
+            * ~Line(scanning_combined.x, start, stop, num)
+        )
     )
     spec = step(
-        (Line(motor_y, start_slow, stop_slow, num) * Line(motor_x, start, stop, num)),
+        (
+            Line(scanning_combined.y, start_slow, stop_slow, num)
+            * Line(scanning_combined.x, start, stop, num)
+        ),
         float(duration),
     )
 
@@ -89,7 +73,7 @@ def panda_scan(
     ss_info = ScanSpecInfo(spec=spec, deadtime=0.1)
     _md = {
         "plan_args": {
-            "detectors": {det.name for det in [p, detector]},
+            "detectors": {det.name for det in [panda, detector]},
             "spec": repr(spec),
         },
         "plan_name": "mapping_scan",
@@ -112,7 +96,8 @@ def panda_scan(
     )
 
     @bpp.run_decorator(md=_md)
-    @bpp.stage_decorator([p, panda_seq, pmac, detector])
+    @bpp.baseline_decorator([scanning_combined])
+    @bpp.stage_decorator([panda, panda_seq, pmac, detector])
     def inner_plan():
         # prepare detector and hdf writer
         yield from bps.prepare(detector, detector_info, wait=True)
@@ -121,14 +106,14 @@ def panda_scan(
         # prepare sequencer table
         yield from bps.prepare(panda_seq, ss_info, wait=True)
         # prepare panda and hdf writer once, at start of scan
-        yield from bps.prepare(p, panda_hdf_info, wait=True)
+        yield from bps.prepare(panda, panda_hdf_info, wait=True)
 
         # Note: PandA datasets PVs need to be set on inenc vals
-        yield from bps.declare_stream(detector, p, name="primary", collect=True)
+        yield from bps.declare_stream(detector, panda, name="primary", collect=True)
 
         # kickoff devices waiting for all of them
         yield from bps.kickoff(detector, wait=True)
-        yield from bps.kickoff(p, wait=True)
+        yield from bps.kickoff(panda, wait=True)
         yield from bps.kickoff(panda_seq, wait=True)
 
         # Start the Trajectory
@@ -138,11 +123,11 @@ def panda_scan(
         yield from bps.collect_while_completing(
             flyers=[
                 pmac_trajectory_flyer,
-                p,
+                panda,
                 panda_seq,
                 detector,
             ],
-            dets=[detector, p],
+            dets=[detector, panda],
             flush_period=0.5,
             stream_name="primary",
         )

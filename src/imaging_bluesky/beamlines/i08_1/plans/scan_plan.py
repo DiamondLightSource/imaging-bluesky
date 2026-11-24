@@ -3,6 +3,7 @@ import bluesky.preprocessors as bpp
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
 from dodal.devices.motors import XYStage
+from dodal.devices.synchrotron import Synchrotron
 from dodal.log import LOGGER
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
@@ -25,6 +26,7 @@ scanning_combined = inject("scanning_combined")
 pmac = inject("scanning_pmac")
 detector = inject("andor_detector")
 panda = inject("panda1")
+synchrotron = inject("synchrotron")
 
 
 def panda_scan(
@@ -42,6 +44,7 @@ def panda_scan(
     pmac: PmacIO = pmac,
     detector: Andor3Detector = detector,
     panda: HDFPanda = panda,
+    synchrotron: Synchrotron = synchrotron,
 ) -> MsgGenerator[None]:
 
     panda_seq = ScanSpecSeqTableFlyableLogic(panda.seq[1]).with_device()
@@ -95,7 +98,7 @@ def panda_scan(
     )
 
     @bpp.stage_decorator([panda, panda_seq, pmac, detector])
-    @bpp.baseline_decorator([scanning_combined])
+    @bpp.baseline_decorator([scanning_combined, synchrotron])
     @bpp.run_decorator(md=_md)
     def inner_plan():
         LOGGER.info("Prepare detector and hdf writer")

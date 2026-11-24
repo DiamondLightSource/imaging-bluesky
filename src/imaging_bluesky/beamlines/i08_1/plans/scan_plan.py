@@ -100,10 +100,13 @@ def panda_scan(
     def inner_plan():
         LOGGER.info("Prepare detector and hdf writer")
         yield from bps.prepare(detector, detector_info, wait=True)
+
         LOGGER.info("Prepare pmac with the trajectory")
         yield from bps.prepare(pmac_trajectory_flyer, info, wait=True)
+
         LOGGER.info("Prepare sequencer table")
         yield from bps.prepare(panda_seq, ss_info, wait=True)
+
         LOGGER.info("Prepare panda and hdf writer once, at start of scan")
         yield from bps.prepare(panda, panda_hdf_info, wait=True)
 

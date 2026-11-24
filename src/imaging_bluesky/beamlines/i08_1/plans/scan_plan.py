@@ -93,9 +93,9 @@ def panda_scan(
         deadtime=deadtime,
     )
 
-    @bpp.run_decorator(md=_md)
-    @bpp.baseline_decorator([scanning_combined])
     @bpp.stage_decorator([panda, panda_seq, pmac, detector])
+    @bpp.baseline_decorator([scanning_combined])
+    @bpp.run_decorator(md=_md)
     def inner_plan():
         # prepare detector and hdf writer
         yield from bps.prepare(detector, detector_info, wait=True)

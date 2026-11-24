@@ -3,6 +3,7 @@ import bluesky.preprocessors as bpp
 from bluesky.utils import MsgGenerator
 from dodal.common import inject
 from dodal.devices.motors import XYStage
+from dodal.log import LOGGER
 from ophyd_async.core import (  # noqa: F401
     DetectorTrigger,
     TriggerInfo,
@@ -97,27 +98,29 @@ def panda_scan(
     @bpp.baseline_decorator([scanning_combined])
     @bpp.run_decorator(md=_md)
     def inner_plan():
-        # prepare detector and hdf writer
+        LOGGER.info("Prepare detector and hdf writer")
         yield from bps.prepare(detector, detector_info, wait=True)
-        # Prepare pmac with the trajectory
+        LOGGER.info("Prepare pmac with the trajectory")
         yield from bps.prepare(pmac_trajectory_flyer, info, wait=True)
-        # prepare sequencer table
+        LOGGER.info("Prepare sequencer table")
         yield from bps.prepare(panda_seq, ss_info, wait=True)
-        # prepare panda and hdf writer once, at start of scan
+        LOGGER.info("Prepare panda and hdf writer once, at start of scan")
         yield from bps.prepare(panda, panda_hdf_info, wait=True)
 
         # Note: PandA datasets PVs need to be set on inenc vals
         yield from bps.declare_stream(detector, panda, name="primary", collect=True)
 
-        # kickoff devices waiting for all of them
+        LOGGER.info("kickoff devices waiting for all of them")
         yield from bps.kickoff(detector, wait=True)
         yield from bps.kickoff(panda, wait=True)
         yield from bps.kickoff(panda_seq, wait=True)
 
-        # Start the Trajectory
+        LOGGER.info("Start the Trajectory")
         yield from bps.kickoff(pmac_trajectory_flyer, wait=True)
 
-        # Wait for the scan to complete whilst continuously collecting the data.
+        LOGGER.info(
+            "Waiting for the scan to complete whilst continuously collecting the data."
+        )
         yield from bps.collect_while_completing(
             flyers=[
                 pmac_trajectory_flyer,

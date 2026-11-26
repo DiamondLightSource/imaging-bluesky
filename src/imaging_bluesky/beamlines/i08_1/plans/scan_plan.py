@@ -11,6 +11,7 @@ from ophyd_async.core import (  # noqa: F401
     TriggerInfo,
 )
 from ophyd_async.epics.adandor3 import Andor3Detector
+from ophyd_async.epics.adcore import setup_ndstats_sum
 from ophyd_async.epics.pmac import (
     PmacIO,
     PmacScanInfo,
@@ -104,6 +105,7 @@ def panda_scan(
         livetime=exposure,
         deadtime=deadtime,
     )
+    setup_ndstats_sum(detector)
 
     @bpp.stage_decorator([panda, panda_seq, pmac, detector])
     @bpp.baseline_decorator([scanning_combined, pgm, synchrotron])

@@ -24,6 +24,7 @@ from ophyd_async.fastcs.panda import (
 from scanspec.specs import Fly, Line, step
 
 scanning_combined = inject("scanning_combined")
+scanning_coarse = inject("scanning_coarse")
 pmac = inject("scanning_pmac")
 detector = inject("andor_detector")
 panda = inject("panda1")
@@ -43,6 +44,7 @@ def panda_scan(
     ramp_time: float | None = None,
     turnaround_time: float | None = None,
     scanning_combined: XYStage = scanning_combined,
+    scanning_coarse: XYStage = scanning_coarse,
     pmac: PmacIO = pmac,
     detector: Andor3Detector = detector,
     panda: HDFPanda = panda,
@@ -52,6 +54,9 @@ def panda_scan(
 
     panda_seq = ScanSpecSeqTableFlyableLogic(panda.seq[1]).with_device()
     deadtime = 0.04202
+
+    fast_centre = stop - (stop - start) / 2
+    slow_centre = stop_slow - (stop_slow - start_slow) / 2
 
     # Prepare motor info using trajectory scanning
     duration = exposure + deadtime
@@ -104,6 +109,10 @@ def panda_scan(
     @bpp.baseline_decorator([scanning_combined, pgm, synchrotron])
     @bpp.run_decorator(md=_md)
     def inner_plan():
+        LOGGER.info("Move coarse motors into position")
+        scanning_coarse.x.set(fast_centre)
+        scanning_coarse.y.set(slow_centre)
+
         LOGGER.info("Prepare detector and hdf writer")
         yield from bps.prepare(detector, detector_info, wait=True)
 

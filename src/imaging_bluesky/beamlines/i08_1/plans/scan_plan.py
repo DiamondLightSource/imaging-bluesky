@@ -105,7 +105,7 @@ def panda_scan(
         livetime=exposure,
         deadtime=deadtime,
     )
-    setup_ndstats_sum(detector)
+    yield from setup_ndstats_sum(detector)
 
     @bpp.stage_decorator([panda, panda_seq, pmac, detector])
     @bpp.baseline_decorator([scanning_combined, pgm, synchrotron])
